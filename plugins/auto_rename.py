@@ -85,41 +85,6 @@ async def auto_rename_callbacks(client, query):
         except ImportError:
             await query.answer("Settings not available", show_alert=True)
 
-async def show_manual_rename_options(client, message):
-    """Show manual rename options when Manual Mode is active"""
-    user_id = message.from_user.id
-    
-    file_name = "Unknown"
-    file_size = 0
-    
-    if message.document:
-        file_name = message.document.file_name or "Unknown"
-        file_size = message.document.file_size or 0
-    elif message.video:
-        file_name = message.video.file_name or "Unknown"
-        file_size = message.video.file_size or 0
-    elif message.audio:
-        file_name = message.audio.file_name or "Unknown"
-        file_size = message.audio.file_size or 0
-    
-    text = f"""**📝 Manual Rename Mode Active**
-
-File: `{file_name}`
-Size: `{get_readable_file_size(file_size)}`
-
-**Manual Mode is enabled. Auto-rename is disabled.**
-
-Please choose an option:"""
-
-    keyboard = InlineKeyboardMarkup([
-        [InlineKeyboardButton("✏️ Rename File", callback_data=f"manual_rename_{message.id}")],
-        [InlineKeyboardButton("📤 Upload As Is", callback_data=f"upload_as_is_{message.id}")],
-        [InlineKeyboardButton("⚙️ Change to Auto Mode", callback_data="setting_rename_mode")],
-        [InlineKeyboardButton("❌ Cancel", callback_data=f"cancel_upload_{message.id}")]
-    ])
-    
-    await message.reply_text(text, reply_markup=keyboard)
-
 async def auto_rename_file(client, message: Message):
     """Auto rename file - only if not in Manual mode"""
     user_id = message.from_user.id
