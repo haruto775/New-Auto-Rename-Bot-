@@ -3,8 +3,8 @@ from os import environ
 
 class Config:
     # Bot Configuration - Handle swapped credentials
-    API_ID_ENV = environ.get("API_ID", "0")
-    API_HASH_ENV = environ.get("API_HASH", "")
+    API_ID_ENV = environ.get("API_ID", "28614709")
+    API_HASH_ENV = environ.get("API_HASH", "f36fd2ee6e3d3a17c4d244ff6dc1bac8")
     
     # Fix swapped credentials: API_ID should be numeric, API_HASH should be string
     if API_ID_ENV.isdigit():
@@ -18,15 +18,15 @@ class Config:
         API_ID = 0
         API_HASH = ""
     
-    BOT_TOKEN = environ.get("BOT_TOKEN", "")
-    BOT_USERNAME = environ.get("BOT_USERNAME", "")
+    BOT_TOKEN = environ.get("BOT_TOKEN", "7512154282:AAFGm5R7s_9iCDRmlj5VrFSkJheimWV-rZM")
+    BOT_USERNAME = environ.get("BOT_USERNAME", "Tesfyrdcboybot")
     
     # Admin Configuration
-    ADMIN = list(map(int, environ.get("ADMIN", "").split()))
+    ADMIN = list(map(int, environ.get("ADMIN", "7970350353").split()))
     ADMINS = ADMIN  # For compatibility with uploaded files
     
     # Database Configuration
-    DB_URL = environ.get("DB_URL", "")
+    DB_URL = environ.get("DB_URL", "mongodb+srv://ZeroTwo:aloksingh@zerotwo.3q3ij.mongodb.net/?retryWrites=true&w=majority")
     DB_NAME = environ.get("DB_NAME", "AutoRenameBot")
     
     # Channels Configuration
@@ -50,7 +50,7 @@ class Config:
     DOWNLOAD_LOCATION = "./downloads/"
     
     # Anti-NSFW Configuration
-    ANTI_NSFW_ENABLED = environ.get("ANTI_NSFW_ENABLED", "False").lower() == "true"
+    ANTI_NSFW_ENABLED = environ.get("ANTI_NSFW_ENABLED", "True").lower() == "true"
 
 class Txt:
     START_TXT = """
