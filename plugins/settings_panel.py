@@ -1,6 +1,6 @@
 import asyncio
 from pyrogram import Client, filters
-from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup, CallbackQuery, Message
+from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup, CallbackQuery, Message, InputMediaPhoto
 from helper.database import DARKXSIDE78
 from config import Config
 import logging
@@ -13,6 +13,14 @@ settings_messages = {}
 
 SETTINGS_PHOTO = "https://graph.org/file/a27d85469761da836337c.jpg"
 
+async def get_settings_photo(user_id: int):
+    """Get the photo to use for settings panel - user's thumbnail if exists, else default"""
+    user_thumbnail = await DARKXSIDE78.get_thumbnail(user_id)
+    if user_thumbnail:
+        return user_thumbnail
+    else:
+        return SETTINGS_PHOTO
+
 @Client.on_message(filters.private & filters.command("settings"))
 async def settings_command(client, message: Message):
     """Main settings command"""
@@ -22,19 +30,22 @@ async def settings_command(client, message: Message):
     # Get current metadata status
     metadata_status = await DARKXSIDE78.get_metadata(user_id)
     
+    # Get current thumbnail status - check if file_id exists
+    thumbnail_status = await DARKXSIDE78.get_thumbnail(user_id)
+    
     # Create settings overview text
     settings_text = f"""**🛠️ Settings for** `{message.from_user.first_name}` **⚙️**
 
-**Custom Thumbnail:** {'Not Exists' if not settings['custom_thumbnail'] else 'Exists'}
+**Custom Thumbnail:** {'Exists' if thumbnail_status else 'Not Exists'}
 **Upload Type:** {settings['send_as'].upper()}
 **Prefix:** {settings['prefix'] or 'None'}
 **Suffix:** {settings['suffix'] or 'None'}
 
 **Upload Destination:** {settings['upload_destination'] or 'None'}
-**Sample Video:** {'Disabled' if not settings['sample_video'] else 'Enabled'}
-**Screenshot:** {'Disabled' if not settings['screenshot_enabled'] else 'Enabled'}
+**Sample Video:** {'Enabled' if settings['sample_video'] else 'Disabled'}
+**Screenshot:** {'Enabled' if settings['screenshot_enabled'] else 'Disabled'}
 
-**Metadata:** {'Disabled' if metadata_status == 'Off' else 'Enabled'}
+**Metadata:** {'Enabled' if metadata_status != 'Off' else 'Disabled'}
 **Remove/Replace Words:** {settings['remove_words'] or 'None'}
 **Rename mode:** {settings['rename_mode']} | {settings['rename_mode']}"""
 
@@ -68,9 +79,12 @@ async def settings_command(client, message: Message):
         ]
     ])
 
+    # Get the appropriate photo - user's thumbnail or default
+    settings_photo = await get_settings_photo(user_id)
+
     try:
         sent_msg = await message.reply_photo(
-            photo=SETTINGS_PHOTO,
+            photo=settings_photo,
             caption=settings_text,
             reply_markup=keyboard
         )
@@ -144,18 +158,21 @@ async def show_main_settings(client, query: CallbackQuery):
     # Get current metadata status
     metadata_status = await DARKXSIDE78.get_metadata(user_id)
     
+    # Get current thumbnail status - check if file_id exists
+    thumbnail_status = await DARKXSIDE78.get_thumbnail(user_id)
+    
     settings_text = f"""**🛠️ Settings for** `{query.from_user.first_name}` **⚙️**
 
-**Custom Thumbnail:** {'Not Exists' if not settings['custom_thumbnail'] else 'Exists'}
+**Custom Thumbnail:** {'Exists' if thumbnail_status else 'Not Exists'}
 **Upload Type:** {settings['send_as'].upper()}
 **Prefix:** {settings['prefix'] or 'None'}
 **Suffix:** {settings['suffix'] or 'None'}
 
 **Upload Destination:** {settings['upload_destination'] or 'None'}
-**Sample Video:** {'Disabled' if not settings['sample_video'] else 'Enabled'}
-**Screenshot:** {'Disabled' if not settings['screenshot_enabled'] else 'Enabled'}
+**Sample Video:** {'Enabled' if settings['sample_video'] else 'Disabled'}
+**Screenshot:** {'Enabled' if settings['screenshot_enabled'] else 'Disabled'}
 
-**Metadata:** {'Disabled' if metadata_status == 'Off' else 'Enabled'}
+**Metadata:** {'Enabled' if metadata_status != 'Off' else 'Disabled'}
 **Remove/Replace Words:** {settings['remove_words'] or 'None'}
 **Rename mode:** {settings['rename_mode']} | {settings['rename_mode']}"""
 
@@ -188,10 +205,23 @@ async def show_main_settings(client, query: CallbackQuery):
         ]
     ])
 
-    await query.message.edit_caption(
-        caption=settings_text,
-        reply_markup=keyboard
-    )
+    # Get the appropriate photo - user's thumbnail or default
+    settings_photo = await get_settings_photo(user_id)
+    
+    # Try to edit the media first, then fallback to caption
+    try:
+        await query.message.edit_media(
+            media=InputMediaPhoto(
+                media=settings_photo,
+                caption=settings_text
+            ),
+            reply_markup=keyboard
+        )
+    except Exception as e:
+        await query.message.edit_caption(
+            caption=settings_text,
+            reply_markup=keyboard
+        )
 
 # Individual setting handlers
 async def handle_upload_mode(client, query: CallbackQuery):
@@ -727,18 +757,21 @@ async def edit_settings_message(client, settings_msg, user_id: int):
         # Get current metadata status
         metadata_status = await DARKXSIDE78.get_metadata(user_id)
         
+        # Get current thumbnail status - check if file_id exists
+        thumbnail_status = await DARKXSIDE78.get_thumbnail(user_id)
+        
         settings_text = f"""**🛠️ Settings for** `{(await client.get_users(user_id)).first_name}` **⚙️**
 
-**Custom Thumbnail:** {'Not Exists' if not settings['custom_thumbnail'] else 'Exists'}
+**Custom Thumbnail:** {'Exists' if thumbnail_status else 'Not Exists'}
 **Upload Type:** {settings['send_as'].upper()}
 **Prefix:** {settings['prefix'] or 'None'}
 **Suffix:** {settings['suffix'] or 'None'}
 
 **Upload Destination:** {settings['upload_destination'] or 'None'}
-**Sample Video:** {'Disabled' if not settings['sample_video'] else 'Enabled'}
-**Screenshot:** {'Disabled' if not settings['screenshot_enabled'] else 'Enabled'}
+**Sample Video:** {'Enabled' if settings['sample_video'] else 'Disabled'}
+**Screenshot:** {'Enabled' if settings['screenshot_enabled'] else 'Disabled'}
 
-**Metadata:** {'Disabled' if metadata_status == 'Off' else 'Enabled'}
+**Metadata:** {'Enabled' if metadata_status != 'Off' else 'Disabled'}
 **Remove/Replace Words:** {settings['remove_words'] or 'None'}
 **Rename mode:** {settings['rename_mode']} | {settings['rename_mode']}"""
 
@@ -771,10 +804,25 @@ async def edit_settings_message(client, settings_msg, user_id: int):
             ]
         ])
 
-        await settings_msg.edit_caption(
-            caption=settings_text,
-            reply_markup=keyboard
-        )
+        # Get the appropriate photo - user's thumbnail or default
+        settings_photo = await get_settings_photo(user_id)
+        
+        # Check if we need to change the photo
+        try:
+            await settings_msg.edit_media(
+                media=InputMediaPhoto(
+                    media=settings_photo,
+                    caption=settings_text
+                ),
+                reply_markup=keyboard
+            )
+        except Exception as e:
+            # If edit_media fails, try edit_caption
+            await settings_msg.edit_caption(
+                caption=settings_text,
+                reply_markup=keyboard
+            )
+
     except Exception as e:
         logging.error(f"Error editing settings message: {e}")
         # Fallback to creating new message
@@ -787,18 +835,21 @@ async def send_main_settings_panel(client, user_id: int, chat_id: int):
     # Get current metadata status
     metadata_status = await DARKXSIDE78.get_metadata(user_id)
     
+    # Get current thumbnail status - check if file_id exists
+    thumbnail_status = await DARKXSIDE78.get_thumbnail(user_id)
+    
     settings_text = f"""**🛠️ Settings for** `{(await client.get_users(user_id)).first_name}` **⚙️**
 
-**Custom Thumbnail:** {'Not Exists' if not settings['custom_thumbnail'] else 'Exists'}
+**Custom Thumbnail:** {'Exists' if thumbnail_status else 'Not Exists'}
 **Upload Type:** {settings['send_as'].upper()}
 **Prefix:** {settings['prefix'] or 'None'}
 **Suffix:** {settings['suffix'] or 'None'}
 
 **Upload Destination:** {settings['upload_destination'] or 'None'}
-**Sample Video:** {'Disabled' if not settings['sample_video'] else 'Enabled'}
-**Screenshot:** {'Disabled' if not settings['screenshot_enabled'] else 'Enabled'}
+**Sample Video:** {'Enabled' if settings['sample_video'] else 'Disabled'}
+**Screenshot:** {'Enabled' if settings['screenshot_enabled'] else 'Disabled'}
 
-**Metadata:** {'Disabled' if metadata_status == 'Off' else 'Enabled'}
+**Metadata:** {'Enabled' if metadata_status != 'Off' else 'Disabled'}
 **Remove/Replace Words:** {settings['remove_words'] or 'None'}
 **Rename mode:** {settings['rename_mode']} | {settings['rename_mode']}"""
 
@@ -831,10 +882,13 @@ async def send_main_settings_panel(client, user_id: int, chat_id: int):
         ]
     ])
 
+    # Get the appropriate photo - user's thumbnail or default
+    settings_photo = await get_settings_photo(user_id)
+
     try:
         await client.send_photo(
             chat_id=chat_id,
-            photo=SETTINGS_PHOTO,
+            photo=settings_photo,
             caption=settings_text,
             reply_markup=keyboard
         )
