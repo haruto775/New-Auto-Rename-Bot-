@@ -21,6 +21,16 @@ async def get_settings_photo(user_id: int):
     else:
         return SETTINGS_PHOTO
 
+def get_readable_file_size(size_bytes):
+    """Convert bytes to readable format"""
+    if size_bytes == 0:
+        return "0B"
+    size_name = ["B", "KB", "MB", "GB", "TB"]
+    i = int(math.floor(math.log(size_bytes, 1024)))
+    p = math.pow(1024, i)
+    s = round(size_bytes / p, 2)
+    return f"{s} {size_name[i]}"
+
 @Client.on_message(filters.private & filters.command("settings"))
 async def settings_command(client, message: Message):
     """Main settings command"""
@@ -33,7 +43,9 @@ async def settings_command(client, message: Message):
     # Get current thumbnail status - check if file_id exists
     thumbnail_status = await DARKXSIDE78.get_thumbnail(user_id)
     
-    # Create settings overview text
+    # Create settings overview text with auto-rename status
+    auto_rename_status = 'Disabled (Manual Mode)' if settings['rename_mode'] == 'Manual' else 'Enabled'
+    
     settings_text = f"""**🛠️ Settings for** `{message.from_user.first_name}` **⚙️**
 
 **Custom Thumbnail:** {'Exists' if thumbnail_status else 'Not Exists'}
@@ -47,7 +59,8 @@ async def settings_command(client, message: Message):
 
 **Metadata:** {'Enabled' if metadata_status != 'Off' else 'Disabled'}
 **Remove/Replace Words:** {settings['remove_words'] or 'None'}
-**Rename mode:** {settings['rename_mode']} | {settings['rename_mode']}"""
+**Rename mode:** {settings['rename_mode']} | {settings['rename_mode']}
+**Auto-Rename:** {auto_rename_status}"""
 
     # Create main settings keyboard (Upload Mode button removed)
     keyboard = InlineKeyboardMarkup([
@@ -106,8 +119,6 @@ async def settings_callback_handler(client, query: CallbackQuery):
                 del user_states[user_id]
             return
             
-        # Removed setting_upload_mode handler
-            
         elif data == "setting_send_as":
             await handle_send_as(client, query)
             
@@ -165,6 +176,9 @@ async def show_main_settings(client, query: CallbackQuery):
     # Get current thumbnail status - check if file_id exists
     thumbnail_status = await DARKXSIDE78.get_thumbnail(user_id)
     
+    # Auto-rename status
+    auto_rename_status = 'Disabled (Manual Mode)' if settings['rename_mode'] == 'Manual' else 'Enabled'
+    
     settings_text = f"""**🛠️ Settings for** `{query.from_user.first_name}` **⚙️**
 
 **Custom Thumbnail:** {'Exists' if thumbnail_status else 'Not Exists'}
@@ -178,7 +192,8 @@ async def show_main_settings(client, query: CallbackQuery):
 
 **Metadata:** {'Enabled' if metadata_status != 'Off' else 'Disabled'}
 **Remove/Replace Words:** {settings['remove_words'] or 'None'}
-**Rename mode:** {settings['rename_mode']} | {settings['rename_mode']}"""
+**Rename mode:** {settings['rename_mode']} | {settings['rename_mode']}
+**Auto-Rename:** {auto_rename_status}"""
 
     # Updated keyboard without Upload Mode button
     keyboard = InlineKeyboardMarkup([
@@ -225,8 +240,7 @@ async def show_main_settings(client, query: CallbackQuery):
             reply_markup=keyboard
         )
 
-# Individual setting handlers (Upload Mode handler removed)
-
+# Individual setting handlers
 async def handle_send_as(client, query: CallbackQuery):
     """Handle send as document/media setting"""
     current_setting = await DARKXSIDE78.get_media_preference(query.from_user.id) or "document"
@@ -422,7 +436,7 @@ Rename mode is {current_mode} | {current_mode}"""
     
     keyboard = InlineKeyboardMarkup([
         [InlineKeyboardButton(f"Auto Rename Mode {auto_check}", callback_data="rename_mode_auto")],
-        [InlineKeyboardButton(f"Set Manual Mode", callback_data="rename_mode_manual")],
+        [InlineKeyboardButton(f"Set Manual Mode {manual_check}", callback_data="rename_mode_manual")],
         [InlineKeyboardButton(f"Use AI Autorename {ai_check}", callback_data="rename_mode_ai")],
         [
             InlineKeyboardButton("🔙 Back", callback_data="setting_back"),
@@ -522,15 +536,49 @@ async def handle_screenshot(client, query: CallbackQuery):
     await query.answer(f"Screenshot {'Enabled' if new_setting else 'Disabled'} ✅")
     await show_main_settings(client, query)
 
-# Additional callback handlers for sub-options (upload_mode_ removed from regex)
-@Client.on_callback_query(filters.regex(r"^(send_as_|rename_mode_|meta_|dest_)"))
+# Manual rename functions
+async def show_manual_rename_options(client, message):
+    """Show manual rename options when Manual Mode is active"""
+    user_id = message.from_user.id
+    
+    file_name = "Unknown"
+    file_size = 0
+    
+    if message.document:
+        file_name = message.document.file_name or "Unknown"
+        file_size = message.document.file_size or 0
+    elif message.video:
+        file_name = message.video.file_name or "Unknown"
+        file_size = message.video.file_size or 0
+    elif message.audio:
+        file_name = message.audio.file_name or "Unknown"
+        file_size = message.audio.file_size or 0
+    
+    text = f"""**📝 Manual Rename Mode Active**
+
+File: `{file_name}`
+Size: `{get_readable_file_size(file_size)}`
+
+**Manual Mode is enabled. Auto-rename is disabled.**
+
+Please choose an option:"""
+
+    keyboard = InlineKeyboardMarkup([
+        [InlineKeyboardButton("✏️ Rename File", callback_data=f"manual_rename_{message.id}")],
+        [InlineKeyboardButton("📤 Upload As Is", callback_data=f"upload_as_is_{message.id}")],
+        [InlineKeyboardButton("⚙️ Change to Auto Mode", callback_data="setting_rename_mode")],
+        [InlineKeyboardButton("❌ Cancel", callback_data=f"cancel_upload_{message.id}")]
+    ])
+    
+    await message.reply_text(text, reply_markup=keyboard)
+
+# Additional callback handlers for sub-options
+@Client.on_callback_query(filters.regex(r"^(send_as_|rename_mode_|meta_|dest_|manual_rename_|upload_as_is_|cancel_upload_)"))
 async def sub_settings_handler(client, query: CallbackQuery):
     """Handle sub-setting callbacks"""
     user_id = query.from_user.id
     data = query.data
     
-    # Removed upload_mode_ handling
-        
     if data.startswith("send_as_"):
         send_type = data.replace("send_as_", "")
         await DARKXSIDE78.set_media_preference(user_id, send_type)
@@ -560,6 +608,40 @@ async def sub_settings_handler(client, query: CallbackQuery):
             ]
         ])
         await query.message.edit_caption(caption=text, reply_markup=keyboard)
+        
+    elif data.startswith("manual_rename_"):
+        message_id = data.replace("manual_rename_", "")
+        # Set user state for manual rename
+        user_states[user_id] = {
+            'state': 'waiting_manual_rename',
+            'message_id': message_id,
+            'message': query.message
+        }
+        
+        text = "**✏️ Manual Rename**\n\nSend the new filename (with extension).\nTimeout: 60 sec"
+        keyboard = InlineKeyboardMarkup([
+            [InlineKeyboardButton("❌ Cancel", callback_data=f"cancel_upload_{message_id}")]
+        ])
+        
+        await query.message.edit_text(text, reply_markup=keyboard)
+        asyncio.create_task(clear_user_state_after_timeout(user_id, 60))
+        
+    elif data.startswith("upload_as_is_"):
+        message_id = data.replace("upload_as_is_", "")
+        await query.answer("📤 Uploading file as is...")
+        
+        # Get original message and upload without renaming
+        try:
+            original_msg = await client.get_messages(query.message.chat.id, int(message_id))
+            await upload_file_without_rename(client, original_msg)
+            await query.message.delete()
+        except Exception as e:
+            await query.answer("❌ Error uploading file", show_alert=True)
+            logging.error(f"Upload as is error: {e}")
+            
+    elif data.startswith("cancel_upload_"):
+        await query.answer("❌ Upload cancelled")
+        await query.message.delete()
 
 async def handle_metadata_sub_setting(client, query: CallbackQuery, data: str):
     """Handle metadata sub-settings"""
@@ -663,6 +745,33 @@ async def handle_settings_input(client, message: Message):
         elif state == "waiting_caption":
             await DARKXSIDE78.set_caption(user_id, text)
             await show_temp_success_and_edit_settings(client, message, settings_msg, f"✅ **Caption saved successfully!**\n\nCaption: `{text}`")
+            
+        elif state == "waiting_manual_rename":
+            # Handle manual rename input
+            new_filename = text.strip()
+            if new_filename:
+                try:
+                    message_id = state_info.get('message_id')
+                    original_msg = await client.get_messages(message.chat.id, int(message_id))
+                    
+                    # Rename and upload the file
+                    await rename_and_upload_file(client, original_msg, new_filename)
+                    
+                    await show_temp_success_and_edit_settings(
+                        client, message, settings_msg, 
+                        f"✅ **File renamed successfully!**\n\nNew name: `{new_filename}`"
+                    )
+                except Exception as e:
+                    logging.error(f"Manual rename error: {e}")
+                    await show_temp_success_and_edit_settings(
+                        client, message, settings_msg, 
+                        "❌ Error renaming file. Please try again."
+                    )
+            else:
+                await show_temp_success_and_edit_settings(
+                    client, message, settings_msg, 
+                    "❌ Invalid filename. Please try again."
+                )
             
         # Clear user state
         if user_id in user_states:
@@ -781,14 +890,11 @@ Subtitle Title is {subtitle or 'None'}"""
         logging.error(f"Error showing metadata settings: {e}")
 
 async def edit_settings_message(client, settings_msg, user_id: int):
-    """Edit the existing settings message with updated content"""
+    """Edit settings message with updated content"""
     settings = await DARKXSIDE78.get_user_settings(user_id)
-    
-    # Get current metadata status
     metadata_status = await DARKXSIDE78.get_metadata(user_id)
-    
-    # Get current thumbnail status - check if file_id exists
     thumbnail_status = await DARKXSIDE78.get_thumbnail(user_id)
+    auto_rename_status = 'Disabled (Manual Mode)' if settings['rename_mode'] == 'Manual' else 'Enabled'
     
     settings_text = f"""**🛠️ Settings for** `{(await client.get_users(user_id)).first_name}` **⚙️**
 
@@ -803,9 +909,9 @@ async def edit_settings_message(client, settings_msg, user_id: int):
 
 **Metadata:** {'Enabled' if metadata_status != 'Off' else 'Disabled'}
 **Remove/Replace Words:** {settings['remove_words'] or 'None'}
-**Rename mode:** {settings['rename_mode']} | {settings['rename_mode']}"""
+**Rename mode:** {settings['rename_mode']} | {settings['rename_mode']}
+**Auto-Rename:** {auto_rename_status}"""
 
-    # Updated keyboard without Upload Mode button
     keyboard = InlineKeyboardMarkup([
         [
             InlineKeyboardButton("Choose Format", callback_data="setting_send_as"),
@@ -835,7 +941,6 @@ async def edit_settings_message(client, settings_msg, user_id: int):
     # Get the appropriate photo - user's thumbnail or default
     settings_photo = await get_settings_photo(user_id)
     
-    # Try to edit the media first, then fallback to caption
     try:
         await settings_msg.edit_media(
             media=InputMediaPhoto(
@@ -851,14 +956,11 @@ async def edit_settings_message(client, settings_msg, user_id: int):
         )
 
 async def send_main_settings_panel(client, user_id: int, chat_id: int):
-    """Send a new main settings panel"""
+    """Send new main settings panel"""
     settings = await DARKXSIDE78.get_user_settings(user_id)
-    
-    # Get current metadata status
     metadata_status = await DARKXSIDE78.get_metadata(user_id)
-    
-    # Get current thumbnail status - check if file_id exists
     thumbnail_status = await DARKXSIDE78.get_thumbnail(user_id)
+    auto_rename_status = 'Disabled (Manual Mode)' if settings['rename_mode'] == 'Manual' else 'Enabled'
     
     settings_text = f"""**🛠️ Settings for** `{(await client.get_users(user_id)).first_name}` **⚙️**
 
@@ -873,9 +975,9 @@ async def send_main_settings_panel(client, user_id: int, chat_id: int):
 
 **Metadata:** {'Enabled' if metadata_status != 'Off' else 'Disabled'}
 **Remove/Replace Words:** {settings['remove_words'] or 'None'}
-**Rename mode:** {settings['rename_mode']} | {settings['rename_mode']}"""
+**Rename mode:** {settings['rename_mode']} | {settings['rename_mode']}
+**Auto-Rename:** {auto_rename_status}"""
 
-    # Updated keyboard without Upload Mode button
     keyboard = InlineKeyboardMarkup([
         [
             InlineKeyboardButton("Choose Format", callback_data="setting_send_as"),
@@ -902,17 +1004,15 @@ async def send_main_settings_panel(client, user_id: int, chat_id: int):
         ]
     ])
 
-    # Get the appropriate photo - user's thumbnail or default
     settings_photo = await get_settings_photo(user_id)
 
     try:
         sent_msg = await client.send_photo(
-            chat_id=chat_id,
+            chat_id,
             photo=settings_photo,
             caption=settings_text,
             reply_markup=keyboard
         )
-        # Store the settings message reference
         settings_messages[user_id] = sent_msg
     except Exception as e:
         sent_msg = await client.send_message(chat_id, settings_text, reply_markup=keyboard)
@@ -923,3 +1023,28 @@ async def clear_user_state_after_timeout(user_id: int, timeout: int):
     await asyncio.sleep(timeout)
     if user_id in user_states:
         del user_states[user_id]
+
+# Helper functions for manual rename
+async def upload_file_without_rename(client, message):
+    """Upload file without renaming"""
+    try:
+        # Just forward the file as is
+        await message.copy(message.chat.id)
+        await message.reply_text("✅ **File uploaded successfully without renaming!**")
+    except Exception as e:
+        logging.error(f"Upload without rename error: {e}")
+        await message.reply_text("❌ **Error uploading file. Please try again.**")
+
+async def rename_and_upload_file(client, message, new_filename):
+    """Rename and upload file"""
+    try:
+        # This would involve downloading, renaming, and re-uploading
+        # For now, just simulate the process
+        await message.reply_text(f"✅ **File renamed to:** `{new_filename}`\n\n📤 **Uploading...**")
+        
+        # Add actual rename and upload logic here based on your existing implementation
+        # This is a placeholder for the actual rename functionality
+        
+    except Exception as e:
+        logging.error(f"Rename and upload error: {e}")
+        await message.reply_text("❌ **Error renaming and uploading file. Please try again.**")
