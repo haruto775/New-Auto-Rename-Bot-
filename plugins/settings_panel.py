@@ -286,6 +286,7 @@ Timeout: 60 sec"""
     
     # Set user state for thumbnail input
     user_states[query.from_user.id] = "waiting_thumbnail"
+    asyncio.create_task(clear_user_state_after_timeout(query.from_user.id, 60))
 
 async def handle_caption_setting(client, query: CallbackQuery):
     """Handle caption setting"""
@@ -314,6 +315,7 @@ Timeout: 60 sec
     
     # Set user state for caption input
     user_states[query.from_user.id] = "waiting_caption"
+    asyncio.create_task(clear_user_state_after_timeout(query.from_user.id, 60))
 
 async def handle_prefix_setting(client, query: CallbackQuery):
     """Handle prefix setting"""
@@ -342,6 +344,7 @@ Prefix = @PublicMirrorLeech
     
     # Set user state for prefix input
     user_states[query.from_user.id] = "waiting_prefix"
+    asyncio.create_task(clear_user_state_after_timeout(query.from_user.id, 60))
 
 async def handle_suffix_setting(client, query: CallbackQuery):
     """Handle suffix setting"""
@@ -370,6 +373,7 @@ Fast_And_Furious @PublicMirrorLeech.mkv
     
     # Set user state for suffix input
     user_states[query.from_user.id] = "waiting_suffix"
+    asyncio.create_task(clear_user_state_after_timeout(query.from_user.id, 60))
 
 async def handle_rename_mode(client, query: CallbackQuery):
     """Handle rename mode setting"""
@@ -462,6 +466,7 @@ Your Current Value is not added yet!"""
     
     # Set user state for remove words input
     user_states[query.from_user.id] = "waiting_remove_words"
+    asyncio.create_task(clear_user_state_after_timeout(query.from_user.id, 60))
 
 async def handle_sample_video(client, query: CallbackQuery):
     """Toggle sample video setting"""
@@ -513,6 +518,7 @@ async def sub_settings_handler(client, query: CallbackQuery):
         
     elif data.startswith("dest_"):
         user_states[user_id] = "waiting_upload_destination"
+        asyncio.create_task(clear_user_state_after_timeout(user_id, 60))
         text = "**Send Upload Destination ID. Timeout: 60 sec**"
         keyboard = InlineKeyboardMarkup([
             [
@@ -539,6 +545,8 @@ async def handle_metadata_sub_setting(client, query: CallbackQuery, data: str):
         user_states[user_id] = "waiting_subtitle_title"
         text = "**Send Subtitle Title. Timeout: 60 sec**"
     
+    asyncio.create_task(clear_user_state_after_timeout(user_id, 60))
+    
     keyboard = InlineKeyboardMarkup([
         [
             InlineKeyboardButton("🔙 Back", callback_data="setting_metadata"),
@@ -561,48 +569,55 @@ async def handle_settings_input(client, message: Message):
     text = message.text.strip()
     
     try:
+        # Delete user's message
+        try:
+            await message.delete()
+        except:
+            pass
+        
         if state == "waiting_prefix":
             await DARKXSIDE78.set_prefix(user_id, text)
-            await message.reply_text(f"✅ **Prefix saved successfully!**\n\nPrefix: `{text}`")
+            # Show success and redirect back to main settings
+            await show_temp_success_and_redirect(client, message, f"✅ **Prefix saved successfully!**\n\nPrefix: `{text}`")
             
         elif state == "waiting_suffix":
             await DARKXSIDE78.set_suffix(user_id, text)
-            await message.reply_text(f"✅ **Suffix saved successfully!**\n\nSuffix: `{text}`")
+            await show_temp_success_and_redirect(client, message, f"✅ **Suffix saved successfully!**\n\nSuffix: `{text}`")
             
         elif state == "waiting_remove_words":
             await DARKXSIDE78.set_remove_words(user_id, text)
-            await message.reply_text(f"✅ **Remove words pattern saved!**\n\nPattern: `{text}`")
+            await show_temp_success_and_redirect(client, message, f"✅ **Remove words pattern saved!**\n\nPattern: `{text}`")
             
         elif state == "waiting_video_title":
             await DARKXSIDE78.set_title(user_id, text)
-            await message.reply_text(f"✅ **Video Title Saved**\n\nTitle: `{text}`")
+            await show_temp_success_and_redirect(client, message, f"✅ **Video Title Saved**\n\nTitle: `{text}`")
             
         elif state == "waiting_video_author":
             await DARKXSIDE78.set_author(user_id, text)
-            await message.reply_text(f"✅ **Video Author Saved**\n\nAuthor: `{text}`")
+            await show_temp_success_and_redirect(client, message, f"✅ **Video Author Saved**\n\nAuthor: `{text}`")
             
         elif state == "waiting_audio_title":
             await DARKXSIDE78.set_audio(user_id, text)
-            await message.reply_text(f"✅ **Audio Title Saved**\n\nTitle: `{text}`")
+            await show_temp_success_and_redirect(client, message, f"✅ **Audio Title Saved**\n\nTitle: `{text}`")
             
         elif state == "waiting_subtitle_title":
             await DARKXSIDE78.set_subtitle(user_id, text)
-            await message.reply_text(f"✅ **Subtitle Title Saved**\n\nTitle: `{text}`")
+            await show_temp_success_and_redirect(client, message, f"✅ **Subtitle Title Saved**\n\nTitle: `{text}`")
             
         elif state == "waiting_upload_destination":
             await DARKXSIDE78.set_upload_destination(user_id, text)
-            await message.reply_text(f"✅ **Upload destination saved!**\n\nDestination: `{text}`")
+            await show_temp_success_and_redirect(client, message, f"✅ **Upload destination saved!**\n\nDestination: `{text}`")
             
         elif state == "waiting_caption":
             await DARKXSIDE78.set_caption(user_id, text)
-            await message.reply_text(f"✅ **Caption saved successfully!**\n\nCaption: `{text}`")
+            await show_temp_success_and_redirect(client, message, f"✅ **Caption saved successfully!**\n\nCaption: `{text}`")
             
         # Clear user state
         del user_states[user_id]
         
     except Exception as e:
         logging.error(f"Settings input error: {e}")
-        await message.reply_text("❌ Error saving setting. Please try again.")
+        await show_temp_success_and_redirect(client, message, "❌ Error saving setting. Please try again.")
 
 @Client.on_message(filters.private & filters.photo)
 async def handle_thumbnail_input(client, message: Message):
@@ -611,9 +626,106 @@ async def handle_thumbnail_input(client, message: Message):
     
     if user_id in user_states and user_states[user_id] == "waiting_thumbnail":
         try:
+            # Delete user's photo message
+            try:
+                await message.delete()
+            except:
+                pass
+                
             await DARKXSIDE78.set_thumbnail(user_id, message.photo.file_id)
-            await message.reply_text("✅ **Thumbnail Saved Successfully ✅️**")
+            
+            # Show success and redirect
+            await show_temp_success_and_redirect(client, message, "✅ **Thumbnail Saved Successfully ✅️**")
+            
             del user_states[user_id]
         except Exception as e:
             logging.error(f"Thumbnail save error: {e}")
-            await message.reply_text("❌ Error saving thumbnail. Please try again.")
+            await show_temp_success_and_redirect(client, message, "❌ Error saving thumbnail. Please try again.")
+
+async def show_temp_success_and_redirect(client, message: Message, success_text: str):
+    """Show temporary success message and redirect to main settings"""
+    # Send success message
+    success_msg = await message.reply_text(success_text)
+    
+    # Wait 2 seconds
+    await asyncio.sleep(2)
+    
+    # Delete success message
+    try:
+        await success_msg.delete()
+    except:
+        pass
+    
+    # Send main settings panel
+    await send_main_settings_panel(client, message.from_user.id, message.chat.id)
+
+async def send_main_settings_panel(client, user_id: int, chat_id: int):
+    """Send main settings panel as new message"""
+    settings = await DARKXSIDE78.get_user_settings(user_id)
+    
+    # Get current metadata status
+    metadata_status = await DARKXSIDE78.get_metadata(user_id)
+    
+    settings_text = f"""**🛠️ Settings for** `{(await client.get_users(user_id)).first_name}` **⚙️**
+
+**Custom Thumbnail:** {'Not Exists' if not settings['custom_thumbnail'] else 'Exists'}
+**Upload Type:** {settings['send_as'].upper()}
+**Prefix:** {settings['prefix'] or 'None'}
+**Suffix:** {settings['suffix'] or 'None'}
+
+**Upload Destination:** {settings['upload_destination'] or 'None'}
+**Sample Video:** {'Disabled' if not settings['sample_video'] else 'Enabled'}
+**Screenshot:** {'Disabled' if not settings['screenshot_enabled'] else 'Enabled'}
+
+**Metadata:** {'Disabled' if metadata_status == 'Off' else 'Enabled'}
+**Remove/Replace Words:** {settings['remove_words'] or 'None'}
+**Rename mode:** {settings['rename_mode']} | {settings['rename_mode']}"""
+
+    keyboard = InlineKeyboardMarkup([
+        [
+            InlineKeyboardButton(f"Upload Mode | {settings['upload_mode']} ✅", callback_data="setting_upload_mode"),
+        ],
+        [
+            InlineKeyboardButton("Send As Media", callback_data="setting_send_as"),
+            InlineKeyboardButton("Set Upload Destination", callback_data="setting_upload_dest")
+        ],
+        [
+            InlineKeyboardButton("Set Thumbnail", callback_data="setting_thumbnail"),
+            InlineKeyboardButton("Set Caption", callback_data="setting_caption")
+        ],
+        [
+            InlineKeyboardButton("Set Prefix", callback_data="setting_prefix"),
+            InlineKeyboardButton("Set Suffix", callback_data="setting_suffix")
+        ],
+        [
+            InlineKeyboardButton(f"Rename Mode | {settings['rename_mode']}", callback_data="setting_rename_mode"),
+            InlineKeyboardButton("Set Metadata", callback_data="setting_metadata")
+        ],
+        [
+            InlineKeyboardButton("Remove Words", callback_data="setting_remove_words"),
+            InlineKeyboardButton(f"Enable Sample Video", callback_data="setting_sample_video")
+        ],
+        [
+            InlineKeyboardButton(f"Enable Screenshot", callback_data="setting_screenshot")
+        ]
+    ])
+
+    try:
+        await client.send_photo(
+            chat_id=chat_id,
+            photo=SETTINGS_PHOTO,
+            caption=settings_text,
+            reply_markup=keyboard
+        )
+    except Exception as e:
+        await client.send_message(
+            chat_id=chat_id,
+            text=settings_text,
+            reply_markup=keyboard
+        )
+
+async def clear_user_state_after_timeout(user_id: int, timeout: int = 60):
+    """Clear user state after timeout"""
+    await asyncio.sleep(timeout)
+    if user_id in user_states:
+        del user_states[user_id]
