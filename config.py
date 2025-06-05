@@ -35,6 +35,7 @@ class Config:
     
     # Media Configuration
     START_PIC = environ.get("START_PIC", "https://graph.org/file/a27d85469761da836337c.jpg")
+    SETTINGS_PHOTO = environ.get("SETTINGS_PHOTO", "https://graph.org/file/a27d85469761da836337c.jpg")
     
     # Server Configuration
     WEBHOOK = environ.get("WEBHOOK", "True").lower() == "true"
@@ -82,6 +83,7 @@ class Txt:
 • `/start` - Start the bot
 • `/autorename <template>` - Set auto rename format
 • `/setmedia` - Choose media type preference
+• `/settings` - Open comprehensive settings panel
 • `/help` - Show this help message
 
 **🎯 File Management:**
@@ -147,6 +149,26 @@ class Txt:
 • Special discounts for bulk purchases
 
 **💬 Contact:** @Bots_Nations_Support
+"""
+
+    FILE_NAME_TXT = """
+**📝 Auto Rename Tutorial:**
+
+**Available Variables:**
+• `episode` or `Episode` or `EPISODE` - Episode number
+• `quality` or `Quality` or `QUALITY` - Video quality
+
+**Example Format:**
+`Naruto Episode [episode] [quality]`
+
+**Current Template:** `{format_template}`
+
+**How to Use:**
+1. Set format using `/autorename <template>`
+2. Send files to be renamed automatically
+3. Bot will detect episode and quality from filename
+
+**Note:** Template will be applied to all files you send!
 """
 
     PROGRESS_BAR = """\n
