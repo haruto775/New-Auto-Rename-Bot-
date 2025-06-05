@@ -3,7 +3,7 @@ import re
 import time
 import shutil
 import asyncio
-import logging  # (if not already imported)
+import logging
 from datetime import datetime
 from PIL import Image
 from pyrogram import Client, filters
@@ -43,7 +43,7 @@ async def start_sequence(client, message: Message):
         active_sequences[user_id] = []
         message_ids[user_id] = []
         msg = await message.reply_text("Sequence started! Send your files.")
-        message_ids[user_id].append(msg.message_id)
+        message_ids[user_id].append(msg.id)
 
 @Client.on_message(filters.command("esequence") & filters.private)
 async def end_sequence(client, message: Message):
@@ -174,10 +174,6 @@ def extract_episode_number(filename):
     # Return None if no pattern matches
     return None
 
-# Example Usage:
-filename = "Naruto Shippuden S01 - EP07 - 1080p [Dual Audio] @Codeflix_Bots.mkv"
-episode_number = extract_episode_number(filename)  
-
 @Client.on_message(filters.private & (filters.document | filters.video | filters.audio))
 async def auto_rename_files(client, message: Message):
     user_id = message.from_user.id
@@ -207,11 +203,11 @@ async def auto_rename_files(client, message: Message):
             is_premium = False
 
     if not is_premium:
-        current_tokens = user_data.get("token", 69)
+        current_tokens = user_data.get("token", 69) if user_data else 69
         if current_tokens <= 0:
             await message.reply_text(
                 "❌ You've run out of tokens!\n\n"
-                "Generate more tokens by completing short links.",
+                "Generate more tokens by completing short links using /gentoken command.",
             )
             return
 
@@ -241,10 +237,10 @@ async def auto_rename_files(client, message: Message):
                 file_name = message.document.file_name
             elif message.video:
                 file_id = message.video.file_id
-                file_name = f"{message.video.file_name}.mp4"
+                file_name = getattr(message.video, 'file_name', None) or f"video_{file_id[:8]}.mp4"
             elif message.audio:
                 file_id = message.audio.file_id
-                file_name = f"{message.audio.file_name}.mp3"
+                file_name = getattr(message.audio, 'file_name', None) or f"audio_{file_id[:8]}.mp3"
 
             file_info = {
                 "file_id": file_id,
@@ -265,16 +261,16 @@ async def auto_rename_files(client, message: Message):
 
         if message.document:
             file_id = message.document.file_id
-            file_name = message.document.file_name
+            file_name = message.document.file_name or f"document_{file_id[:8]}"
             media_type = media_preference or "document"
         elif message.video:
             file_id = message.video.file_id
-            file_name = f"{message.video.file_name}.mp4"
+            file_name = getattr(message.video, 'file_name', None) or f"video_{file_id[:8]}.mp4"
             media_type = media_preference or "video"
         elif message.audio:
             file_id = message.audio.file_id
-            file_name = f"{message.audio.file_name}.mp3"
-            media_type = media_preference or "audio"
+            file_name = getattr(message.audio, 'file_name', None) or f"audio_{file_id[:8]}.mp3"
+            media_type = media_preference or "document"
         else:
             return await message.reply_text("Unsupported File Type")
 
@@ -298,18 +294,19 @@ async def auto_rename_files(client, message: Message):
                     extracted_qualities = extract_quality(file_name)
                     if extracted_qualities == "Unknown":
                         await message.reply_text("**__I Was Not Able To Extract The Quality Properly. Renaming As 'Unknown'...__**")
-                        # Mark the file as ignored
-                        del renaming_operations[file_id]
-                        return  # Exit the handler if quality extraction fails
+                        # Continue with renaming instead of returning
                 
-                    format_template = format_template.replace(quality_placeholder, "".join(extracted_qualities))
+                    format_template = format_template.replace(quality_placeholder, str(extracted_qualities))
 
         _, file_extension = os.path.splitext(file_name)
         renamed_file_name = f"{format_template}{file_extension}"
+        
+        # Create directories if they don't exist
+        os.makedirs("downloads", exist_ok=True)
+        os.makedirs("Metadata", exist_ok=True)
+        
         renamed_file_path = f"downloads/{renamed_file_name}"
         metadata_file_path = f"Metadata/{renamed_file_name}"
-        os.makedirs(os.path.dirname(renamed_file_path), exist_ok=True)
-        os.makedirs(os.path.dirname(metadata_file_path), exist_ok=True)
 
         download_msg = await message.reply_text("**__Downloading...__**")
 
@@ -324,162 +321,102 @@ async def auto_rename_files(client, message: Message):
             del renaming_operations[file_id]
             return await download_msg.edit(f"**Download Error:** {e}")
 
-        await download_msg.edit("**__Renaming and Adding Metadata...__**")
+        await download_msg.edit("**__Processing and Adding Metadata...__**")
 
         try:
-            # Rename the file
-            os.rename(path, renamed_file_path)
-            path = renamed_file_path
-
-            # Prepare metadata command
-            ffmpeg_cmd = shutil.which('ffmpeg')
-            metadata_command = [
-                ffmpeg_cmd,
-                '-i', path,
-                '-metadata', f'title={await DARKXSIDE78.get_title(user_id)}',
-                '-metadata', f'artist={await DARKXSIDE78.get_artist(user_id)}',
-                '-metadata', f'author={await DARKXSIDE78.get_author(user_id)}',
-                '-metadata:s:v', f'title={await DARKXSIDE78.get_video(user_id)}',
-                '-metadata:s:a', f'title={await DARKXSIDE78.get_audio(user_id)}',
-                '-metadata:s:s', f'title={await DARKXSIDE78.get_subtitle(user_id)}',
-                '-metadata', f'encoded_by={await DARKXSIDE78.get_encoded_by(user_id)}',
-                '-metadata', f'custom_tag={await DARKXSIDE78.get_custom_tag(user_id)}',
-                '-map', '0',
-                '-c', 'copy',
-                '-loglevel', 'error',
-                metadata_file_path
-            ]
-
-            # Execute the metadata command
-            process = await asyncio.create_subprocess_exec(
-                *metadata_command,
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE
-            )
-            stdout, stderr = await process.communicate()
-
-            if process.returncode != 0:
-                error_message = stderr.decode()
-                await download_msg.edit(f"**Metadata Error:**\n{error_message}")
-                return
-                
-            # Use the new metadata file path for the upload
-            path = metadata_file_path
-
-            # Upload the file
-            upload_msg = await download_msg.edit("**__Uploading...__**")
-            await DARKXSIDE78.col.update_one(
-                {"_id": user_id},
-                {"$inc": {"rename_count": 1}}
-            )
-
-            ph_path = None
-            c_caption = await DARKXSIDE78.get_caption(message.chat.id)
-            c_thumb = await DARKXSIDE78.get_thumbnail(message.chat.id)
-
-            caption = (
-                c_caption.format(
-                    filename=renamed_file_name,
-                    filesize=humanbytes(message.document.file_size),
-                    duration=convert(0),
-                )
-                if c_caption
-                else f"**{renamed_file_name}**"
-            )
-
-            if c_thumb:
-                ph_path = await client.download_media(c_thumb)
-            elif media_type == "video" and message.video.thumbs:
-                ph_path = await client.download_media(message.video.thumbs[0].file_id)
-
-            if ph_path:
-                img = Image.open(ph_path).convert("RGB")
-                img = img.resize((320, 320))
-                img.save(ph_path, "JPEG")
-
-            try:
-                # Send to USER and capture the sent message
-                if media_type == "document":
-                    user_sent_message = await client.send_document(
-                        message.chat.id,
-                        document=path,
-                        thumb=ph_path,
-                        caption=caption,
-                        progress=progress_for_pyrogram,
-                        progress_args=("Upload Started...", upload_msg, time.time()),
+            # Check if metadata is enabled
+            metadata_enabled = await DARKXSIDE78.get_metadata(user_id)
+            
+            if metadata_enabled == "On":
+                # Prepare metadata command
+                ffmpeg_cmd = shutil.which('ffmpeg')
+                if ffmpeg_cmd:
+                    metadata_command = [
+                        ffmpeg_cmd,
+                        '-i', path,
+                        '-metadata', f'title={await DARKXSIDE78.get_title(user_id)}',
+                        '-metadata', f'artist={await DARKXSIDE78.get_artist(user_id)}',
+                        '-metadata', f'author={await DARKXSIDE78.get_author(user_id)}',
+                        '-metadata:s:v', f'title={await DARKXSIDE78.get_video(user_id)}',
+                        '-metadata:s:a', f'title={await DARKXSIDE78.get_audio(user_id)}',
+                        '-metadata:s:s', f'title={await DARKXSIDE78.get_subtitle(user_id)}',
+                        '-c', 'copy',
+                        metadata_file_path
+                    ]
+                    
+                    # Execute FFmpeg command
+                    process = await asyncio.create_subprocess_exec(
+                        *metadata_command,
+                        stdout=asyncio.subprocess.PIPE,
+                        stderr=asyncio.subprocess.PIPE
                     )
-                elif media_type == "video":
-                    user_sent_message = await client.send_video(
-                        message.chat.id,
-                        video=path,
-                        caption=caption,
-                        thumb=ph_path,
-                        duration=0,
-                        progress=progress_for_pyrogram,
-                        progress_args=("Upload Started...", upload_msg, time.time()),
-                    )
-                elif media_type == "audio":
-                    user_sent_message = await client.send_audio(
-                        message.chat.id,
-                        audio=path,
-                        caption=caption,
-                        thumb=ph_path,
-                        duration=0,
-                        progress=progress_for_pyrogram,
-                        progress_args=("Upload Started...", upload_msg, time.time()),
-                    )
-
-                # Now forward the sent message to DUMP CHANNEL with forward tag
-                if Config.DUMP_CHANNEL:
-                    try:
-                        timestamp = datetime.now(pytz.timezone("Asia/Kolkata")).strftime('%Y-%m-%d %H:%M:%S %Z')
-                        user_details = (
-                            f"👤 **User Details**\n"
-                            f"• ID: `{user.id}`\n"
-                            f"• Name: {user.first_name or 'Unknown'}\n"
-                            f"• Username: @{user.username if user.username else 'N/A'}\n"
-                            f"• Premium: {'✅' if is_premium else '❌'}\n"
-                            f"⏰ Time: `{timestamp}`\n"
-                            f"📄 Original Filename: `{file_name}`\n"
-                            f"🔄 Renamed Filename: `{renamed_file_name}`\n"
-                        )
-
-                        # Use copy_message to forward with a custom caption
-                        await client.copy_message(
-                            chat_id=Config.DUMP_CHANNEL,
-                            from_chat_id=message.chat.id,
-                            message_id=user_sent_message.id,
-                            caption=user_details
-                        )
-
-                        logging.info(f"File forwarded to dump channel: {renamed_file_name}")
-
-                    except Exception as e:
-                        error_msg = f"⚠️ Failed to forward file to dump channel: {str(e)}"
-                        await client.send_message(Config.LOG_CHANNEL, error_msg)
-                        logging.error(error_msg, exc_info=True)
-
-            except Exception as e:
-                logging.error(f"Error Upload file: {e}")
-
-            await download_msg.delete() 
+                    stdout, stderr = await process.communicate()
+                    
+                    if process.returncode == 0:
+                        # Use metadata file
+                        path = metadata_file_path
+                    else:
+                        logging.error(f"FFmpeg error: {stderr.decode()}")
+                        # Continue with original file
+                        pass
+                else:
+                    logging.warning("FFmpeg not found, skipping metadata addition")
 
         except Exception as e:
-            logging.error(f"Error in file processing: {e}")
-            await download_msg.edit(f"**Error:** {e}")
+            logging.error(f"Metadata processing error: {e}")
+            # Continue with original file
+
+        await download_msg.edit("**__Uploading...__**")
+
+        # Get thumbnail and caption
+        thumbnail = await DARKXSIDE78.get_thumbnail(user_id)
+        caption = await DARKXSIDE78.get_caption(user_id)
+        
+        # Format caption if provided
+        if caption:
+            formatted_caption = caption.format(
+                filename=renamed_file_name,
+                filesize=humanbytes(os.path.getsize(path)) if os.path.exists(path) else "Unknown"
+            )
+        else:
+            formatted_caption = f"**{renamed_file_name}**"
+
+        try:
+            # Upload based on media preference
+            if media_type == "video":
+                await client.send_video(
+                    chat_id=message.chat.id,
+                    video=path,
+                    caption=formatted_caption,
+                    thumb=thumbnail,
+                    progress=progress_for_pyrogram,
+                    progress_args=("Upload Started...", download_msg, time.time())
+                )
+            else:
+                await client.send_document(
+                    chat_id=message.chat.id,
+                    document=path,
+                    caption=formatted_caption,
+                    thumb=thumbnail,
+                    progress=progress_for_pyrogram,
+                    progress_args=("Upload Started...", download_msg, time.time())
+                )
+
+            await download_msg.delete()
+
+        except Exception as e:
+            await download_msg.edit(f"**Upload Error:** {e}")
 
         finally:
-            # Clean up
-            if os.path.exists(renamed_file_path):
-                os.remove(renamed_file_path)
-            if os.path.exists(metadata_file_path):
-                os.remove(metadata_file_path)
-            if ph_path and os.path.exists(ph_path):
-                os.remove(ph_path)
-            if file_id in renaming_operations:
-                del renaming_operations[file_id]
-                os.remove(metadata_file_path)
-            if ph_path and os.path.exists(ph_path):
-                os.remove(ph_path)
+            # Cleanup files
+            try:
+                if os.path.exists(path):
+                    os.remove(path)
+                if os.path.exists(metadata_file_path) and metadata_file_path != path:
+                    os.remove(metadata_file_path)
+            except Exception as e:
+                logging.error(f"Cleanup error: {e}")
+            
+            # Remove from operations
             if file_id in renaming_operations:
                 del renaming_operations[file_id]
