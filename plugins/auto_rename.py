@@ -1,10 +1,21 @@
 import asyncio
 import logging
+import math
+import os
+import re
 from pyrogram import Client, filters
 from pyrogram.types import Message, InlineKeyboardButton, InlineKeyboardMarkup
 from helper.database import DARKXSIDE78
-import os
-import re
+
+def get_readable_file_size(size_bytes):
+    """Convert bytes to readable format"""
+    if size_bytes == 0:
+        return "0B"
+    size_name = ["B", "KB", "MB", "GB", "TB"]
+    i = int(math.floor(math.log(size_bytes, 1024)))
+    p = math.pow(1024, i)
+    s = round(size_bytes / p, 2)
+    return f"{s} {size_name[i]}"
 
 @Client.on_message(filters.private & filters.command("autorename"))
 async def auto_rename_command(client, message: Message):
@@ -68,8 +79,46 @@ async def auto_rename_callbacks(client, query):
         
     elif data == "autorename_settings":
         # Redirect to settings
-        from plugins.settings_panel import show_main_settings
-        await show_main_settings(client, query)
+        try:
+            from plugins.settings_panel import show_main_settings
+            await show_main_settings(client, query)
+        except ImportError:
+            await query.answer("Settings not available", show_alert=True)
+
+async def show_manual_rename_options(client, message):
+    """Show manual rename options when Manual Mode is active"""
+    user_id = message.from_user.id
+    
+    file_name = "Unknown"
+    file_size = 0
+    
+    if message.document:
+        file_name = message.document.file_name or "Unknown"
+        file_size = message.document.file_size or 0
+    elif message.video:
+        file_name = message.video.file_name or "Unknown"
+        file_size = message.video.file_size or 0
+    elif message.audio:
+        file_name = message.audio.file_name or "Unknown"
+        file_size = message.audio.file_size or 0
+    
+    text = f"""**📝 Manual Rename Mode Active**
+
+File: `{file_name}`
+Size: `{get_readable_file_size(file_size)}`
+
+**Manual Mode is enabled. Auto-rename is disabled.**
+
+Please choose an option:"""
+
+    keyboard = InlineKeyboardMarkup([
+        [InlineKeyboardButton("✏️ Rename File", callback_data=f"manual_rename_{message.id}")],
+        [InlineKeyboardButton("📤 Upload As Is", callback_data=f"upload_as_is_{message.id}")],
+        [InlineKeyboardButton("⚙️ Change to Auto Mode", callback_data="setting_rename_mode")],
+        [InlineKeyboardButton("❌ Cancel", callback_data=f"cancel_upload_{message.id}")]
+    ])
+    
+    await message.reply_text(text, reply_markup=keyboard)
 
 async def auto_rename_file(client, message: Message):
     """Auto rename file - only if not in Manual mode"""
