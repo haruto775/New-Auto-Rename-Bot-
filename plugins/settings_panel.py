@@ -55,7 +55,7 @@ async def settings_command(client, message: Message):
             InlineKeyboardButton(f"Upload Mode | {settings['upload_mode']} ✅", callback_data="setting_upload_mode"),
         ],
         [
-            InlineKeyboardButton("Send As Media", callback_data="setting_send_as"),
+            InlineKeyboardButton("Choose Format", callback_data="setting_send_as"),
             InlineKeyboardButton("Set Upload Destination", callback_data="setting_upload_dest")
         ],
         [
@@ -189,7 +189,7 @@ async def show_main_settings(client, query: CallbackQuery):
             InlineKeyboardButton(f"Upload Mode | {settings['upload_mode']} ✅", callback_data="setting_upload_mode"),
         ],
         [
-            InlineKeyboardButton("Send As Media", callback_data="setting_send_as"),
+            InlineKeyboardButton("Choose Format", callback_data="setting_send_as"),
             InlineKeyboardButton("Set Upload Destination", callback_data="setting_upload_dest")
         ],
         [
@@ -258,7 +258,7 @@ async def handle_send_as(client, query: CallbackQuery):
     """Handle send as document/media setting"""
     current_setting = await DARKXSIDE78.get_media_preference(query.from_user.id) or "document"
     
-    text = f"""**📁 Send As Configuration**
+    text = f"""**📁 Choose Format Configuration**
 
 Current Setting: **{current_setting.title()}**
 
@@ -840,7 +840,7 @@ async def edit_settings_message(client, settings_msg, user_id: int):
                 InlineKeyboardButton(f"Upload Mode | {settings['upload_mode']} ✅", callback_data="setting_upload_mode"),
             ],
             [
-                InlineKeyboardButton("Send As Media", callback_data="setting_send_as"),
+                InlineKeyboardButton("Choose Format", callback_data="setting_send_as"),
                 InlineKeyboardButton("Set Upload Destination", callback_data="setting_upload_dest")
             ],
             [
@@ -918,7 +918,7 @@ async def send_main_settings_panel(client, user_id: int, chat_id: int):
             InlineKeyboardButton(f"Upload Mode | {settings['upload_mode']} ✅", callback_data="setting_upload_mode"),
         ],
         [
-            InlineKeyboardButton("Send As Media", callback_data="setting_send_as"),
+            InlineKeyboardButton("Choose Format", callback_data="setting_send_as"),
             InlineKeyboardButton("Set Upload Destination", callback_data="setting_upload_dest")
         ],
         [
