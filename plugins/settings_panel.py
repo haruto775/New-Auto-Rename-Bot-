@@ -49,11 +49,8 @@ async def settings_command(client, message: Message):
 **Remove/Replace Words:** {settings['remove_words'] or 'None'}
 **Rename mode:** {settings['rename_mode']} | {settings['rename_mode']}"""
 
-    # Create main settings keyboard
+    # Create main settings keyboard (Upload Mode button removed)
     keyboard = InlineKeyboardMarkup([
-        [
-            InlineKeyboardButton(f"Upload Mode | {settings['upload_mode']} ✅", callback_data="setting_upload_mode"),
-        ],
         [
             InlineKeyboardButton("Choose Format", callback_data="setting_send_as"),
             InlineKeyboardButton("Set Upload Destination", callback_data="setting_upload_dest")
@@ -109,8 +106,7 @@ async def settings_callback_handler(client, query: CallbackQuery):
                 del user_states[user_id]
             return
             
-        elif data == "setting_upload_mode":
-            await handle_upload_mode(client, query)
+        # Removed setting_upload_mode handler
             
         elif data == "setting_send_as":
             await handle_send_as(client, query)
@@ -184,10 +180,8 @@ async def show_main_settings(client, query: CallbackQuery):
 **Remove/Replace Words:** {settings['remove_words'] or 'None'}
 **Rename mode:** {settings['rename_mode']} | {settings['rename_mode']}"""
 
+    # Updated keyboard without Upload Mode button
     keyboard = InlineKeyboardMarkup([
-        [
-            InlineKeyboardButton(f"Upload Mode | {settings['upload_mode']} ✅", callback_data="setting_upload_mode"),
-        ],
         [
             InlineKeyboardButton("Choose Format", callback_data="setting_send_as"),
             InlineKeyboardButton("Set Upload Destination", callback_data="setting_upload_dest")
@@ -231,28 +225,7 @@ async def show_main_settings(client, query: CallbackQuery):
             reply_markup=keyboard
         )
 
-# Individual setting handlers
-async def handle_upload_mode(client, query: CallbackQuery):
-    """Handle upload mode setting"""
-    text = """**📤 Upload Mode Configuration**
-
-Select how you want to upload your files:
-
-• **Telegram**: Upload directly to current chat
-• **Channel**: Upload to a specific channel  
-• **Group**: Upload to a specific group"""
-
-    keyboard = InlineKeyboardMarkup([
-        [InlineKeyboardButton("Telegram ✅", callback_data="upload_mode_telegram")],
-        [InlineKeyboardButton("Channel", callback_data="upload_mode_channel")],
-        [InlineKeyboardButton("Group", callback_data="upload_mode_group")],
-        [
-            InlineKeyboardButton("🔙 Back", callback_data="setting_back"),
-            InlineKeyboardButton("❌ Close", callback_data="setting_close")
-        ]
-    ])
-    
-    await query.message.edit_caption(caption=text, reply_markup=keyboard)
+# Individual setting handlers (Upload Mode handler removed)
 
 async def handle_send_as(client, query: CallbackQuery):
     """Handle send as document/media setting"""
@@ -549,20 +522,16 @@ async def handle_screenshot(client, query: CallbackQuery):
     await query.answer(f"Screenshot {'Enabled' if new_setting else 'Disabled'} ✅")
     await show_main_settings(client, query)
 
-# Additional callback handlers for sub-options
-@Client.on_callback_query(filters.regex(r"^(upload_mode_|send_as_|rename_mode_|meta_|dest_)"))
+# Additional callback handlers for sub-options (upload_mode_ removed from regex)
+@Client.on_callback_query(filters.regex(r"^(send_as_|rename_mode_|meta_|dest_)"))
 async def sub_settings_handler(client, query: CallbackQuery):
     """Handle sub-setting callbacks"""
     user_id = query.from_user.id
     data = query.data
     
-    if data.startswith("upload_mode_"):
-        mode = data.replace("upload_mode_", "").title()
-        await DARKXSIDE78.update_user_setting(user_id, 'upload_mode', mode)
-        await query.answer(f"Upload mode set to {mode} ✅")
-        await show_main_settings(client, query)
+    # Removed upload_mode_ handling
         
-    elif data.startswith("send_as_"):
+    if data.startswith("send_as_"):
         send_type = data.replace("send_as_", "")
         await DARKXSIDE78.set_media_preference(user_id, send_type)
         await query.answer(f"Send as {send_type} ✅")
@@ -727,17 +696,19 @@ async def handle_thumbnail_input(client, message: Message):
                     
                 await DARKXSIDE78.set_thumbnail(user_id, message.photo.file_id)
                 
-                # Show success and edit existing settings
-                await show_temp_success_and_edit_settings(client, message, settings_msg, "✅ **Thumbnail Saved Successfully ✅️**")
-                
+                # Clear user state
                 if user_id in user_states:
                     del user_states[user_id]
+                
+                # Show success and redirect to main settings
+                await show_temp_success_and_edit_settings(client, message, settings_msg, "✅ **Thumbnail saved successfully!**")
+                
             except Exception as e:
-                logging.error(f"Thumbnail save error: {e}")
+                logging.error(f"Thumbnail input error: {e}")
                 await show_temp_success_and_edit_settings(client, message, settings_msg, "❌ Error saving thumbnail. Please try again.")
 
 async def show_temp_success_and_edit_settings(client, message: Message, settings_msg, success_text: str):
-    """Show temporary success message and edit existing settings panel"""
+    """Show temporary success message and edit back to main settings"""
     # Send success message
     success_msg = await message.reply_text(success_text)
     
@@ -750,7 +721,7 @@ async def show_temp_success_and_edit_settings(client, message: Message, settings
     except:
         pass
     
-    # Edit the original settings message instead of creating new one
+    # Edit back to main settings
     if settings_msg:
         await edit_settings_message(client, settings_msg, message.from_user.id)
     else:
@@ -811,85 +782,6 @@ Subtitle Title is {subtitle or 'None'}"""
 
 async def edit_settings_message(client, settings_msg, user_id: int):
     """Edit the existing settings message with updated content"""
-    try:
-        settings = await DARKXSIDE78.get_user_settings(user_id)
-        
-        # Get current metadata status
-        metadata_status = await DARKXSIDE78.get_metadata(user_id)
-        
-        # Get current thumbnail status - check if file_id exists
-        thumbnail_status = await DARKXSIDE78.get_thumbnail(user_id)
-        
-        settings_text = f"""**🛠️ Settings for** `{(await client.get_users(user_id)).first_name}` **⚙️**
-
-**Custom Thumbnail:** {'Exists' if thumbnail_status else 'Not Exists'}
-**Upload Type:** {settings['send_as'].upper()}
-**Prefix:** {settings['prefix'] or 'None'}
-**Suffix:** {settings['suffix'] or 'None'}
-
-**Upload Destination:** {settings['upload_destination'] or 'None'}
-**Sample Video:** {'Enabled' if settings['sample_video'] else 'Disabled'}
-**Screenshot:** {'Enabled' if settings['screenshot_enabled'] else 'Disabled'}
-
-**Metadata:** {'Enabled' if metadata_status != 'Off' else 'Disabled'}
-**Remove/Replace Words:** {settings['remove_words'] or 'None'}
-**Rename mode:** {settings['rename_mode']} | {settings['rename_mode']}"""
-
-        keyboard = InlineKeyboardMarkup([
-            [
-                InlineKeyboardButton(f"Upload Mode | {settings['upload_mode']} ✅", callback_data="setting_upload_mode"),
-            ],
-            [
-                InlineKeyboardButton("Choose Format", callback_data="setting_send_as"),
-                InlineKeyboardButton("Set Upload Destination", callback_data="setting_upload_dest")
-            ],
-            [
-                InlineKeyboardButton("Set Thumbnail", callback_data="setting_thumbnail"),
-                InlineKeyboardButton("Set Caption", callback_data="setting_caption")
-            ],
-            [
-                InlineKeyboardButton("Set Prefix", callback_data="setting_prefix"),
-                InlineKeyboardButton("Set Suffix", callback_data="setting_suffix")
-            ],
-            [
-                InlineKeyboardButton(f"Rename Mode | {settings['rename_mode']}", callback_data="setting_rename_mode"),
-                InlineKeyboardButton("Set Metadata", callback_data="setting_metadata")
-            ],
-            [
-                InlineKeyboardButton("Remove Words", callback_data="setting_remove_words"),
-                InlineKeyboardButton(f"Enable Sample Video", callback_data="setting_sample_video")
-            ],
-            [
-                InlineKeyboardButton(f"Enable Screenshot", callback_data="setting_screenshot")
-            ]
-        ])
-
-        # Get the appropriate photo - user's thumbnail or default
-        settings_photo = await get_settings_photo(user_id)
-        
-        # Check if we need to change the photo
-        try:
-            await settings_msg.edit_media(
-                media=InputMediaPhoto(
-                    media=settings_photo,
-                    caption=settings_text
-                ),
-                reply_markup=keyboard
-            )
-        except Exception as e:
-            # If edit_media fails, try edit_caption
-            await settings_msg.edit_caption(
-                caption=settings_text,
-                reply_markup=keyboard
-            )
-
-    except Exception as e:
-        logging.error(f"Error editing settings message: {e}")
-        # Fallback to creating new message
-        await send_main_settings_panel(client, user_id, settings_msg.chat.id)
-
-async def send_main_settings_panel(client, user_id: int, chat_id: int):
-    """Send main settings panel as new message"""
     settings = await DARKXSIDE78.get_user_settings(user_id)
     
     # Get current metadata status
@@ -913,10 +805,78 @@ async def send_main_settings_panel(client, user_id: int, chat_id: int):
 **Remove/Replace Words:** {settings['remove_words'] or 'None'}
 **Rename mode:** {settings['rename_mode']} | {settings['rename_mode']}"""
 
+    # Updated keyboard without Upload Mode button
     keyboard = InlineKeyboardMarkup([
         [
-            InlineKeyboardButton(f"Upload Mode | {settings['upload_mode']} ✅", callback_data="setting_upload_mode"),
+            InlineKeyboardButton("Choose Format", callback_data="setting_send_as"),
+            InlineKeyboardButton("Set Upload Destination", callback_data="setting_upload_dest")
         ],
+        [
+            InlineKeyboardButton("Set Thumbnail", callback_data="setting_thumbnail"),
+            InlineKeyboardButton("Set Caption", callback_data="setting_caption")
+        ],
+        [
+            InlineKeyboardButton("Set Prefix", callback_data="setting_prefix"),
+            InlineKeyboardButton("Set Suffix", callback_data="setting_suffix")
+        ],
+        [
+            InlineKeyboardButton(f"Rename Mode | {settings['rename_mode']}", callback_data="setting_rename_mode"),
+            InlineKeyboardButton("Set Metadata", callback_data="setting_metadata")
+        ],
+        [
+            InlineKeyboardButton("Remove Words", callback_data="setting_remove_words"),
+            InlineKeyboardButton(f"Enable Sample Video", callback_data="setting_sample_video")
+        ],
+        [
+            InlineKeyboardButton(f"Enable Screenshot", callback_data="setting_screenshot")
+        ]
+    ])
+
+    # Get the appropriate photo - user's thumbnail or default
+    settings_photo = await get_settings_photo(user_id)
+    
+    # Try to edit the media first, then fallback to caption
+    try:
+        await settings_msg.edit_media(
+            media=InputMediaPhoto(
+                media=settings_photo,
+                caption=settings_text
+            ),
+            reply_markup=keyboard
+        )
+    except Exception as e:
+        await settings_msg.edit_caption(
+            caption=settings_text,
+            reply_markup=keyboard
+        )
+
+async def send_main_settings_panel(client, user_id: int, chat_id: int):
+    """Send a new main settings panel"""
+    settings = await DARKXSIDE78.get_user_settings(user_id)
+    
+    # Get current metadata status
+    metadata_status = await DARKXSIDE78.get_metadata(user_id)
+    
+    # Get current thumbnail status - check if file_id exists
+    thumbnail_status = await DARKXSIDE78.get_thumbnail(user_id)
+    
+    settings_text = f"""**🛠️ Settings for** `{(await client.get_users(user_id)).first_name}` **⚙️**
+
+**Custom Thumbnail:** {'Exists' if thumbnail_status else 'Not Exists'}
+**Upload Type:** {settings['send_as'].upper()}
+**Prefix:** {settings['prefix'] or 'None'}
+**Suffix:** {settings['suffix'] or 'None'}
+
+**Upload Destination:** {settings['upload_destination'] or 'None'}
+**Sample Video:** {'Enabled' if settings['sample_video'] else 'Disabled'}
+**Screenshot:** {'Enabled' if settings['screenshot_enabled'] else 'Disabled'}
+
+**Metadata:** {'Enabled' if metadata_status != 'Off' else 'Disabled'}
+**Remove/Replace Words:** {settings['remove_words'] or 'None'}
+**Rename mode:** {settings['rename_mode']} | {settings['rename_mode']}"""
+
+    # Updated keyboard without Upload Mode button
+    keyboard = InlineKeyboardMarkup([
         [
             InlineKeyboardButton("Choose Format", callback_data="setting_send_as"),
             InlineKeyboardButton("Set Upload Destination", callback_data="setting_upload_dest")
@@ -946,20 +906,19 @@ async def send_main_settings_panel(client, user_id: int, chat_id: int):
     settings_photo = await get_settings_photo(user_id)
 
     try:
-        await client.send_photo(
+        sent_msg = await client.send_photo(
             chat_id=chat_id,
             photo=settings_photo,
             caption=settings_text,
             reply_markup=keyboard
         )
+        # Store the settings message reference
+        settings_messages[user_id] = sent_msg
     except Exception as e:
-        await client.send_message(
-            chat_id=chat_id,
-            text=settings_text,
-            reply_markup=keyboard
-        )
+        sent_msg = await client.send_message(chat_id, settings_text, reply_markup=keyboard)
+        settings_messages[user_id] = sent_msg
 
-async def clear_user_state_after_timeout(user_id: int, timeout: int = 60):
+async def clear_user_state_after_timeout(user_id: int, timeout: int):
     """Clear user state after timeout"""
     await asyncio.sleep(timeout)
     if user_id in user_states:
