@@ -105,6 +105,8 @@ async def settings_callback_handler(client, query: CallbackQuery):
             await query.message.delete()
             if user_id in settings_messages:
                 del settings_messages[user_id]
+            if user_id in user_states:
+                del user_states[user_id]
             return
             
         elif data == "setting_upload_mode":
@@ -132,6 +134,9 @@ async def settings_callback_handler(client, query: CallbackQuery):
             await handle_rename_mode(client, query)
             
         elif data == "setting_metadata":
+            # Clear any user states when going to metadata
+            if user_id in user_states:
+                del user_states[user_id]
             await handle_metadata_setting(client, query)
             
         elif data == "setting_remove_words":
@@ -144,6 +149,9 @@ async def settings_callback_handler(client, query: CallbackQuery):
             await handle_screenshot(client, query)
             
         elif data == "setting_back":
+            # Clear any user states when going back to main
+            if user_id in user_states:
+                del user_states[user_id]
             await show_main_settings(client, query)
             
     except Exception as e:
@@ -665,19 +673,19 @@ async def handle_settings_input(client, message: Message):
             
         elif state == "waiting_video_title":
             await DARKXSIDE78.set_title(user_id, text)
-            await show_temp_success_and_edit_settings(client, message, settings_msg, f"✅ **Video Title Saved**\n\nTitle: `{text}`")
+            await show_temp_success_and_redirect_to_metadata(client, message, settings_msg, f"✅ **Video Title Saved**\n\nTitle: `{text}`")
             
         elif state == "waiting_video_author":
             await DARKXSIDE78.set_author(user_id, text)
-            await show_temp_success_and_edit_settings(client, message, settings_msg, f"✅ **Video Author Saved**\n\nAuthor: `{text}`")
+            await show_temp_success_and_redirect_to_metadata(client, message, settings_msg, f"✅ **Video Author Saved**\n\nAuthor: `{text}`")
             
         elif state == "waiting_audio_title":
             await DARKXSIDE78.set_audio(user_id, text)
-            await show_temp_success_and_edit_settings(client, message, settings_msg, f"✅ **Audio Title Saved**\n\nTitle: `{text}`")
+            await show_temp_success_and_redirect_to_metadata(client, message, settings_msg, f"✅ **Audio Title Saved**\n\nTitle: `{text}`")
             
         elif state == "waiting_subtitle_title":
             await DARKXSIDE78.set_subtitle(user_id, text)
-            await show_temp_success_and_edit_settings(client, message, settings_msg, f"✅ **Subtitle Title Saved**\n\nTitle: `{text}`")
+            await show_temp_success_and_redirect_to_metadata(client, message, settings_msg, f"✅ **Subtitle Title Saved**\n\nTitle: `{text}`")
             
         elif state == "waiting_upload_destination":
             await DARKXSIDE78.set_upload_destination(user_id, text)
@@ -748,6 +756,58 @@ async def show_temp_success_and_edit_settings(client, message: Message, settings
     else:
         # Fallback: create new settings panel if no reference found
         await send_main_settings_panel(client, message.from_user.id, message.chat.id)
+
+async def show_temp_success_and_redirect_to_metadata(client, message: Message, settings_msg, success_text: str):
+    """Show temporary success message and redirect to metadata settings"""
+    # Send success message
+    success_msg = await message.reply_text(success_text)
+    
+    # Wait 2 seconds
+    await asyncio.sleep(2)
+    
+    # Delete success message
+    try:
+        await success_msg.delete()
+    except:
+        pass
+    
+    # Show metadata settings instead of main settings
+    if settings_msg:
+        await show_metadata_settings(client, settings_msg, message.from_user.id)
+    else:
+        # Fallback: create new settings panel if no reference found
+        await send_main_settings_panel(client, message.from_user.id, message.chat.id)
+
+async def show_metadata_settings(client, settings_msg, user_id: int):
+    """Show metadata settings panel"""
+    current = await DARKXSIDE78.get_metadata(user_id)
+    title = await DARKXSIDE78.get_title(user_id)
+    author = await DARKXSIDE78.get_author(user_id)
+    audio = await DARKXSIDE78.get_audio(user_id)
+    subtitle = await DARKXSIDE78.get_subtitle(user_id)
+    
+    text = f"""**🏷️ Metadata Setting for** `{(await client.get_users(user_id)).first_name}` **⚙️**
+
+Video Title is {title or 'None'}
+Video Author is {author or 'None'}  
+Audio Title is {audio or 'None'}
+Subtitle Title is {subtitle or 'None'}"""
+
+    keyboard = InlineKeyboardMarkup([
+        [InlineKeyboardButton("Set Video Title", callback_data="meta_video_title")],
+        [InlineKeyboardButton("Set Video Author", callback_data="meta_video_author")],
+        [InlineKeyboardButton("Set Audio Title", callback_data="meta_audio_title")],
+        [InlineKeyboardButton("Set Subtitle Title", callback_data="meta_subtitle_title")],
+        [
+            InlineKeyboardButton("🔙 Back", callback_data="setting_back"),
+            InlineKeyboardButton("❌ Close", callback_data="setting_close")
+        ]
+    ])
+    
+    try:
+        await settings_msg.edit_caption(caption=text, reply_markup=keyboard)
+    except Exception as e:
+        logging.error(f"Error showing metadata settings: {e}")
 
 async def edit_settings_message(client, settings_msg, user_id: int):
     """Edit the existing settings message with updated content"""
