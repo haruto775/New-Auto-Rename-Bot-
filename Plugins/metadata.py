@@ -63,7 +63,7 @@ async def metadata_callback(client, query: CallbackQuery):
             reply_markup=InlineKeyboardMarkup([
                 [
                     InlineKeyboardButton("Hᴏᴍᴇ", callback_data="start"),
-                    InlineKeyboardButton("Bᴀᴄᴋ", callback_data="commands")
+                    InlineKeyboardButton("Bᴀᴄᴋ", callback_data="metadata_back")
                 ]
             ])
         )
@@ -106,6 +106,9 @@ async def metadata_callback(client, query: CallbackQuery):
     ]
     await query.message.edit_text(text=text, reply_markup=InlineKeyboardMarkup(buttons), disable_web_page_preview=True)
 
+@Client.on_callback_query(filters.regex("metadata_back"))
+async def metadata_back_callback(client, query: CallbackQuery):
+    await metadata(client, query.message)
 
 @Client.on_message(filters.private & filters.command('settitle'))
 async def title(client, message):
@@ -177,4 +180,4 @@ async def custom_tag(client, message):
             "**Gɪᴠᴇ Tʜᴇ Cᴜsᴛᴏᴍ Tᴀɢ Tɪᴛʟᴇ\n\nExᴀᴍᴩʟᴇ:- /setcustom_tag @GenAnimeOfc**")
     custom_tag = message.text.split(" ", 1)[1]
     await db.set_custom_tag(message.from_user.id, custom_tag=custom_tag)
-    await message.reply_text("**✅ Eɴᴄᴏᴅᴇᴅ Bʏ Sᴀᴠᴇᴅ**")
+    await message.reply_text("**✅ Cᴜsᴛᴏᴍ Tᴀɢ Sᴀᴠᴇᴅ**")
