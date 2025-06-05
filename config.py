@@ -1,193 +1,159 @@
-import re, os, time
-from os import environ, getenv
-id_pattern = re.compile(r'^.\d+$') 
+import os
+from os import environ 
 
-
-class Config(object):
-    # pyro client config
-    API_ID    = os.environ.get("API_ID", "23476863")
-    API_HASH  = os.environ.get("API_HASH", "69daa0835439c4211f34c2e9ad0acb5c")
-    BOT_TOKEN = os.environ.get("BOT_TOKEN", "7639679576:AAGfns05RYjs7Svo-CxB_Wk9vWu2XQKQ98A") 
-
-    # database config
-    DB_NAME = os.environ.get("DB_NAME","Haruto75")     
-    DB_URL  = os.environ.get("DB_URL","mongodb+srv://Haruto75:Haruto75@cluster075.iqqwknk.mongodb.net/?retryWrites=true&w=majority&appName=Cluster075")
-    PORT = os.environ.get("PORT", "8080")
- 
-    # other configs
-    BOT_UPTIME  = time.time()
-    START_PIC   = os.environ.get("START_PIC", "https://w0.peakpx.com/wallpaper/290/313/HD-wallpaper-anime-jujutsu-kaisen-satoru-gojo-boy.jpg")
-    ADMIN       = [int(admin) if id_pattern.search(admin) else admin for admin in os.environ.get('ADMIN', '6497757690').split()]
-    FORCE_SUB_CHANNELS = os.environ.get('FORCE_SUB_CHANNELS', 'Mythic_Bots,MythicBot_Support').split(',')
-    LOG_CHANNEL = os.environ.get("LOG_CHANNEL", "-1002686116676")
-    DUMP_CHANNEL = os.environ.get("DUMP_CHANNEL", "-1002629771463")
-    BOT_USERNAME = os.environ.get("BOT_USERNAME", "AnimeXAuto_RenameBot")
-    #TOKEN_API = "https://instantearn.in/api?api=fa0dc64a5224ed38ec7b25c70f40922a1f8aeb15&format=text"
-    #TOKEN_API = "acc6e6472d44943f4f91ae36e4e2431d432c59fe"
-   # SHORTENER_URL = "https://droplink.co/api"
-    #TOKEN_ID_LENGTH = 8  # Length of token IDs
+class Config:
+    # Bot Configuration - Handle swapped credentials
+    API_ID_ENV = environ.get("API_ID", "0")
+    API_HASH_ENV = environ.get("API_HASH", "")
     
-    # wes response configuration     
-    WEBHOOK = bool(os.environ.get("WEBHOOK", "True"))
-
-
-class Txt(object):
-    # part of text configuration
-        
-    START_TXT = """<b>ʜᴇʏ! {}  
-
-» ɪ ᴀᴍ ᴀᴅᴠᴀɴᴄᴇᴅ ʀᴇɴᴀᴍᴇ ʙᴏᴛ! ᴡʜɪᴄʜ ᴄᴀɴ ᴀᴜᴛᴏʀᴇɴᴀᴍᴇ ʏᴏᴜʀ ғɪʟᴇs ᴡɪᴛʜ ᴄᴜsᴛᴏᴍ ᴄᴀᴘᴛɪᴏɴ ᴀɴᴅ ᴛʜᴜᴍʙɴᴀɪʟ ᴀɴᴅ ᴀʟsᴏ sᴇǫᴜᴇɴᴄᴇ ᴛʜᴇᴍ ᴘᴇʀғᴇᴄᴛʟʏ</b>"""
+    # Fix swapped credentials: API_ID should be numeric, API_HASH should be string
+    if API_ID_ENV.isdigit():
+        API_ID = int(API_ID_ENV)
+        API_HASH = API_HASH_ENV
+    elif API_HASH_ENV.isdigit():
+        # Values are swapped
+        API_ID = int(API_HASH_ENV)
+        API_HASH = API_ID_ENV
+    else:
+        API_ID = 0
+        API_HASH = ""
     
-    FILE_NAME_TXT = """<b>» <u>sᴇᴛᴜᴘ ᴀᴜᴛᴏ ʀᴇɴᴀᴍᴇ ғᴏʀᴍᴀᴛ</u></b>
-
-<b>ᴠᴀʀɪᴀʙʟᴇꜱ :</b>
-➲ ᴇᴘɪꜱᴏᴅᴇ - ᴛᴏ ʀᴇᴘʟᴀᴄᴇ ᴇᴘɪꜱᴏᴅᴇ ɴᴜᴍʙᴇʀ
-➲ ǫᴜᴀʟɪᴛʏ - ᴛᴏ ʀᴇᴘʟᴀᴄᴇ ǫᴜᴀʟɪᴛʏ
-
-<b>‣ ꜰᴏʀ ᴇx:- </b> <code> /autorename [S1-episode] Prison School [Quality] [Dual] @Bots_Nation </code>
-
-<b>‣ /Autorename: ʀᴇɴᴀᴍᴇ ʏᴏᴜʀ ᴍᴇᴅɪᴀ ꜰɪʟᴇꜱ ʙʏ ɪɴᴄʟᴜᴅɪɴɢ 'ᴇᴘɪꜱᴏᴅᴇ' ᴀɴᴅ 'ǫᴜᴀʟɪᴛʏ' ᴠᴀʀɪᴀʙʟᴇꜱ ɪɴ ʏᴏᴜʀ ᴛᴇxᴛ, ᴛᴏ ᴇxᴛʀᴀᴄᴛ ᴇᴘɪꜱᴏᴅᴇ ᴀɴᴅ ǫᴜᴀʟɪᴛʏ ᴘʀᴇꜱᴇɴᴛ ɪɴ ᴛʜᴇ ᴏʀɪɢɪɴᴀʟ ꜰɪʟᴇɴᴀᴍᴇ. """
+    BOT_TOKEN = environ.get("BOT_TOKEN", "")
+    BOT_USERNAME = environ.get("BOT_USERNAME", "")
     
-    ABOUT_TXT = f"""<b>❍ ᴍʏ ɴᴀᴍᴇ : <a href="https://t.me/autorenamerxbot">ᴀᴜᴛᴏ ʀᴇɴᴀᴍᴇ</a>
-❍ ᴅᴇᴠᴇʟᴏᴩᴇʀ : <a href="https://t.me/darkxside78">ᴅᴀʀᴋxsɪᴅᴇ</a>
-❍ ʟᴀɴɢᴜᴀɢᴇ : <a href="https://www.python.org/">ᴘʏᴛʜᴏɴ</a>
-❍ ᴅᴀᴛᴀʙᴀꜱᴇ : <a href="https://www.mongodb.com/">ᴍᴏɴɢᴏ ᴅʙ</a>
-❍ ʜᴏꜱᴛᴇᴅ ᴏɴ : <a href="https://t.me/bots_nation">ᴠᴘs</a>
-❍ ᴍᴀɪɴ ᴄʜᴀɴɴᴇʟ : <a href="https://t.me/bots_nation">ʙᴏᴛꜱ ɴᴀᴛɪᴏɴ</a>
-❍ ʜᴇʟᴘ ᴄʜᴀɴɴᴇʟ : <a href="https://t.me/Bots_Nation_Support">ʙᴏᴛꜱ ɴᴀᴛɪᴏɴ ꜱᴜᴘᴘᴏʀᴛ</a>
-
-➻ ᴄʟɪᴄᴋ ᴏɴ ᴛʜᴇ ʙᴜᴛᴛᴏɴs ɢɪᴠᴇɴ ʙᴇʟᴏᴡ ғᴏʀ ɢᴇᴛᴛɪɴɢ ʙᴀsɪᴄ ʜᴇʟᴩ ᴀɴᴅ ɪɴғᴏ ᴀʙᴏᴜᴛ ᴍᴇ.</b>"""
-
+    # Admin Configuration
+    ADMIN = list(map(int, environ.get("ADMIN", "").split()))
+    ADMINS = ADMIN  # For compatibility with uploaded files
     
-    THUMBNAIL_TXT = """<b><u>» ᴛᴏ ꜱᴇᴛ ᴄᴜꜱᴛᴏᴍ ᴛʜᴜᴍʙɴᴀɪʟ</u></b>
+    # Database Configuration
+    DB_URL = environ.get("DB_URL", "")
+    DB_NAME = environ.get("DB_NAME", "AutoRenameBot")
     
-➲ /start: ꜱᴇɴᴅ ᴀɴʏ ᴘʜᴏᴛᴏ ᴛᴏ ᴀᴜᴛᴏᴍᴀᴛɪᴄᴀʟʟʏ ꜱᴇᴛ ɪᴛ ᴀꜱ ᴀ ᴛʜᴜᴍʙɴᴀɪʟ..
-➲ /del_thumb: ᴜꜱᴇ ᴛʜɪꜱ ᴄᴏᴍᴍᴀɴᴅ ᴛᴏ ᴅᴇʟᴇᴛᴇ ʏᴏᴜʀ ᴏʟᴅ ᴛʜᴜᴍʙɴᴀɪʟ.
-➲ /view_thumb: ᴜꜱᴇ ᴛʜɪꜱ ᴄᴏᴍᴍᴀɴᴅ ᴛᴏ ᴠɪᴇᴡ ʏᴏᴜʀ ᴄᴜʀʀᴇɴᴛ ᴛʜᴜᴍʙɴᴀɪʟ.
-
-ɴᴏᴛᴇ: ɪꜰ ɴᴏ ᴛʜᴜᴍʙɴᴀɪʟ ꜱᴀᴠᴇᴅ ɪɴ ʙᴏᴛ ᴛʜᴇɴ, ɪᴛ ᴡɪʟʟ ᴜꜱᴇ ᴛʜᴜᴍʙɴᴀɪʟ ᴏꜰ ᴛʜᴇ ᴏʀɪɢɪɴɪᴀʟ ꜰɪʟᴇ ᴛᴏ ꜱᴇᴛ ɪɴ ʀᴇɴᴀᴍᴇᴅ ꜰɪʟᴇ"""
-
-    CAPTION_TXT = """<b><u>» ᴛᴏ ꜱᴇᴛ ᴄᴜꜱᴛᴏᴍ ᴄᴀᴘᴛɪᴏɴ ᴀɴᴅ ᴍᴇᴅɪᴀ ᴛʏᴘᴇ</u></b>
+    # Channels Configuration
+    FORCE_SUB_CHANNELS = environ.get("FORCE_SUB_CHANNELS", "").split(",") if environ.get("FORCE_SUB_CHANNELS") else []
+    LOG_CHANNEL = int(environ.get("LOG_CHANNEL", "0")) if environ.get("LOG_CHANNEL") else None
     
-<b>ᴠᴀʀɪᴀʙʟᴇꜱ :</b>         
-ꜱɪᴢᴇ: {ꜰɪʟᴇꜱɪᴢᴇ}
-ᴅᴜʀᴀᴛɪᴏɴ: {duration}
-ꜰɪʟᴇɴᴀᴍᴇ: {ꜰɪʟᴇɴᴀᴍᴇ}
-
-➲ /set_caption: ᴛᴏ ꜱᴇᴛ ᴀ ᴄᴜꜱᴛᴏᴍ ᴄᴀᴘᴛɪᴏɴ.
-➲ /see_caption: ᴛᴏ ᴠɪᴇᴡ ʏᴏᴜʀ ᴄᴜꜱᴛᴏᴍ ᴄᴀᴘᴛɪᴏɴ.
-➲ /del_caption: ᴛᴏ ᴅᴇʟᴇᴛᴇ ʏᴏᴜʀ ᴄᴜꜱᴛᴏᴍ ᴄᴀᴘᴛɪᴏɴ.
-
-» ꜰᴏʀ ᴇx:- /set_caption ꜰɪʟᴇ ɴᴀᴍᴇ: {ꜰɪʟᴇɴᴀᴍᴇ}"""
-
-    PROGRESS_BAR = """\n
-<b>» Size</b> : {1} | {2}
-<b>» Done</b> : {0}%
-<b>» Speed</b> : {3}/s
-<b>» ETA</b> : {4} """
+    # Media Configuration
+    START_PIC = environ.get("START_PIC", "https://graph.org/file/a27d85469761da836337c.jpg")
     
+    # Server Configuration
+    WEBHOOK = environ.get("WEBHOOK", "True").lower() == "true"
+    BOT_UPTIME = environ.get("BOT_UPTIME", "")
     
-    DONATE_TXT = """<blockquote> ᴛʜᴀɴᴋs ғᴏʀ sʜᴏᴡɪɴɢ ɪɴᴛᴇʀᴇsᴛ ɪɴ ᴅᴏɴᴀᴛɪᴏɴ</blockquote>
-
-<b><i>💞  ɪꜰ ʏᴏᴜ ʟɪᴋᴇ ᴏᴜʀ ʙᴏᴛ ꜰᴇᴇʟ ꜰʀᴇᴇ ᴛᴏ ᴅᴏɴᴀᴛᴇ ᴀɴʏ ᴀᴍᴏᴜɴᴛ ₹𝟷𝟶, ₹𝟸𝟶, ₹𝟻𝟶, ₹𝟷𝟶𝟶, ᴇᴛᴄ.</i></b>
-
-ᴅᴏɴᴀᴛɪᴏɴs ᴀʀᴇ ʀᴇᴀʟʟʏ ᴀᴘᴘʀᴇᴄɪᴀᴛᴇᴅ ɪᴛ ʜᴇʟᴘs ɪɴ ʙᴏᴛ ᴅᴇᴠᴇʟᴏᴘᴍᴇɴᴛ
-
- <u>ʏᴏᴜ ᴄᴀɴ ᴀʟsᴏ ᴅᴏɴᴀᴛᴇ ᴛʜʀᴏᴜɢʜ ᴜᴘɪ</u>
-
- ᴜᴘɪ ɪᴅ : <code>ramkamo3363-3@oksbi</code>
- Qʀ : [ᴄʟɪᴄᴋ ʜᴇʀᴇ](https://envs.sh/PVT.jpg)
- Qʀ 2 : [ᴄʟɪᴄᴋ ʜᴇʀᴇ](https://envs.sh/PVA.jpg) 
-
-ɪғ ʏᴏᴜ ᴡɪsʜ ʏᴏᴜ ᴄᴀɴ sᴇɴᴅ ᴜs ss
-ᴏɴ - @darkxside78"""
-
-    PREMIUM_TXT = """<b>ᴜᴘɢʀᴀᴅᴇ ᴛᴏ ᴏᴜʀ ᴘʀᴇᴍɪᴜᴍ sᴇʀᴠɪᴄᴇ ᴀɴᴅ ᴇɴJᴏʏ ᴇxᴄʟᴜsɪᴠᴇ ғᴇᴀᴛᴜʀᴇs:
-○ ᴜɴʟɪᴍɪᴛᴇᴅ Rᴇɴᴀᴍɪɴɢ.
-○ ɴᴏ ᴀᴅꜱ.
-○ ᴇᴀʀʟʏ Aᴄᴄᴇss.
-○ ᴍᴏʀᴇ ᴘʀɪᴏʀɪᴛʏ
-
-• ᴜꜱᴇ /plan ᴛᴏ ꜱᴇᴇ ᴀʟʟ ᴏᴜʀ ᴘʟᴀɴꜱ ᴀᴛ ᴏɴᴄᴇ.
-
-➲ ғɪʀsᴛ sᴛᴇᴘ : ᴘᴀʏ ᴛʜᴇ ᴀᴍᴏᴜɴᴛ ᴀᴄᴄᴏʀᴅɪɴɢ ᴛᴏ ʏᴏᴜʀ ғᴀᴠᴏʀɪᴛᴇ ᴘʟᴀɴ ᴛᴏ ᴛʜᴇ ᴜᴘɪ ɪᴅ ᴏʀ Qʀ.
-➲ secoɴᴅ sᴛᴇᴘ : ᴛᴀᴋᴇ ᴀ sᴄʀᴇᴇɴsʜᴏᴛ ᴏғ ʏᴏᴜʀ ᴘᴀʏᴍᴇɴᴛ ᴀɴᴅ sʜᴀʀᴇ ɪᴛ ᴅɪʀᴇᴄᴛʟʏ ʜᴇʀᴇ: @darkxside78, @Jas_Mehra ᴏʀ @Blakite_Ravii
-➲ ᴀʟᴛᴇʀɴᴀᴛɪᴠᴇ sᴛᴇᴘ : ᴏʀ ᴜᴘʟᴏᴀᴅ ᴛʜᴇ sᴄʀᴇᴇɴsʜᴏᴛ ʜᴇʀᴇ ᴀɴᴅ ʀᴇᴘʟʏ ᴡɪᴛʜ ᴛʜᴇ /bought ᴄᴏᴍᴍᴀɴᴅ. [ᴍᴀʏ ɴᴏᴛ ᴡᴏʀᴋ ᴘʀᴏᴘᴇʀʟʏ]
-
-Yᴏᴜʀ ᴘʀᴇᴍɪᴜᴍ ᴘʟᴀɴ ᴡɪʟʟ ʙᴇ ᴀᴄᴛɪᴠᴀᴛᴇᴅ ᴀғᴛᴇʀ ᴠᴇʀɪғɪᴄᴀᴛɪᴏɴ</b>"""
-
-    PREPLANS_TXT = """<b>👋 ʜᴇʟʟᴏ ʙʀᴏ,
+    # Token System Configuration
+    TOKEN_ID_LENGTH = 8
+    SHORTENER_API = environ.get("SHORTENER_API", "")
+    SHORTENER_URL = environ.get("SHORTENER_URL", "")
     
-🎖️ <u>ᴀᴠᴀɪʟᴀʙʟᴇ ᴘʟᴀɴs</u> :
-
-Pʀɪᴄɪɴɢ:
-➜ ᴅᴀɪʟʏ ᴘʀᴇᴍɪᴜᴍ: ₹10/ᴅᴀʏ
-➜ ᴍᴏɴᴛʜʟʏ ᴘʀᴇᴍɪᴜᴍ: ₹80/ᴍᴏɴᴛʜ
-➜ ʟɪꜰᴇᴛɪᴍᴇ ᴘʀᴇᴍɪᴜᴍ: ₹459
-➜ ғᴏʀ ʙᴏᴛ ʜᴏsᴛɪɴɢ: [ᴄᴏɴᴛᴀᴄᴛ ᴜꜱ](https://t.me/darkxside78)
-
-➲ ᴜᴘɪ ɪᴅ - <code>ramkamo3363-3@oksbi</code>
-
-‼️ᴜᴘʟᴏᴀᴅ ᴛʜᴇ ᴘᴀʏᴍᴇɴᴛ sᴄʀᴇᴇɴsʜᴏᴛ ʜᴇʀᴇ ᴀɴᴅ ʀᴇᴘʟʏ ᴡɪᴛʜ ᴛʜᴇ /bought ᴄᴏᴍᴍᴀɴᴅ.</b>"""
+    # File Processing Configuration
+    MAX_FILE_SIZE = 2 * 1024 * 1024 * 1024  # 2GB
+    DOWNLOAD_LOCATION = "./downloads/"
     
-    HELP_TXT = """<b>ʜᴇʀᴇ ɪꜱ ʜᴇʟᴘ ᴍᴇɴᴜ ɪᴍᴘᴏʀᴛᴀɴᴛ ᴄᴏᴍᴍᴀɴᴅꜱ:
+    # Anti-NSFW Configuration
+    ANTI_NSFW_ENABLED = environ.get("ANTI_NSFW_ENABLED", "False").lower() == "true"
 
-ᴀᴡᴇsᴏᴍᴇ ғᴇᴀᴛᴜʀᴇs🫧
+class Txt:
+    START_TXT = """
+**ʜᴇʟʟᴏ {} 👋**
 
-ʀᴇɴᴀᴍᴇ ʙᴏᴛ ɪꜱ ᴀ ʜᴀɴᴅʏ ᴛᴏᴏʟ ᴛʜᴀᴛ ʜᴇʟᴘꜱ ʏᴏᴜ ʀᴇɴᴀᴍᴇ ᴀɴᴅ ᴍᴀɴᴀɢᴇ ʏᴏᴜʀ ꜰɪʟᴇꜱ ᴇꜰꜰᴏʀᴛʟᴇꜱꜱʟʏ.
+**ɪ ᴀᴍ ᴀɴ ᴀᴅᴠᴀɴᴄᴇᴅ ᴀᴜᴛᴏ ʀᴇɴᴀᴍᴇ ʙᴏᴛ ᴡɪᴛʜ ᴍᴀɴʏ ғᴇᴀᴛᴜʀᴇs**
 
-➲ /autorename: ᴀᴜᴛᴏ ʀᴇɴᴀᴍᴇ ʏᴏᴜʀ ꜰɪʟᴇꜱ.
-➲ /metadata: ᴄᴏᴍᴍᴀɴᴅꜱ ᴛᴏ ᴛᴜʀɴ ᴏɴ ᴏғғ ᴍᴇᴛᴀᴅᴀᴛᴀ.
-➲ /help: ɢᴇᴛ ǫᴜɪᴄᴋ ᴀꜱꜱɪꜱᴛᴀɴᴄᴇ.</b>"""
+**I can rename your files automatically with custom templates!**
 
-    SEND_METADATA = """
-<b>--Metadata Settings:--</b>
+**Use /autorename to get started**
+"""
 
-➜ /metadata: Turn on or off metadata.
+    ABOUT_TXT = """
+╭───────────⍟
+├🤖 **ᴍy ɴᴀᴍᴇ:** [ᴀᴜᴛᴏ ʀᴇɴᴀᴍᴇ](https://t.me/AutoRenameBot)
+├🖥️ **ꜱᴇʀᴠᴇʀ:** Heroku
+├📕 **ʟɪʙʀᴀʀy:** Pyrogram
+├✏️ **ʟᴀɴɢᴜᴀɢᴇ:** Python 3
+├📂 **ᴅᴀᴛᴀʙᴀꜱᴇ:** MongoDB
+├📊 **ʙᴏᴛ ᴠᴇʀꜱɪᴏɴ:** v2.7.8
+├🌟 **ᴀᴜᴛʜᴏʀ:** [DARKXSIDE78](https://t.me/DARKXSIDE78)
+╰───────────⍟
+"""
 
-<b>Description</b> : Metadata will change MKV video files including all audio, streams, and subtitle titles."""
+    HELP_TXT = """
+**🔸 Available Commands:**
 
+**📝 Basic Commands:**
+• `/start` - Start the bot
+• `/autorename <template>` - Set auto rename format
+• `/setmedia` - Choose media type preference
+• `/help` - Show this help message
 
-    SOURCE_TXT = """
-<b>ʜᴇʏ,
-ᴛʜɪs ɪs ᴀɴ ᴀᴜᴛᴏ ʀᴇɴᴀᴍᴇ ʙᴏᴛ,
-ᴄʀᴇᴀᴛᴇᴅ ʙʏ [ʙᴏᴛꜱ ɴᴀᴛɪᴏɴ](https://t.me/Bots_Nation).</b>
+**🎯 File Management:**
+• `/ssequence` - Start file sequence
+• `/esequence` - End file sequence
+• Send photo to set thumbnail
+• `/viewthumb` - View current thumbnail
+• `/delthumb` - Delete thumbnail
 
-ᴡʀɪᴛᴛᴇɴ ɪɴ ᴩʏᴛʜᴏɴ ᴡɪᴛʜ ᴛʜᴇ ʜᴇʟᴩ ᴏғ :
-[ᴩʏʀᴏɢʀᴀᴍ](https://github.com/pyrogram/pyrogram)
-[ᴩʏᴛʜᴏɴ-ᴛᴇʟᴇɢʀᴀᴍ-ʙᴏᴛ](https://github.com/python-telegram-bot/python-telegram-bot)
-ᴀɴᴅ ᴜsɪɴɢ [ᴍᴏɴɢᴏ](https://cloud.mongodb.com) ᴀs ᴅᴀᴛᴀʙᴀsᴇ."""
+**⚙️ Settings:**
+• `/metadata` - Configure metadata settings
+• `/set_caption <text>` - Set custom caption
+• `/see_caption` - View current caption
+• `/del_caption` - Delete caption
+
+**💎 Token System:**
+• `/token` - Check token balance
+• `/gentoken` - Generate token link
+
+**📊 Admin Commands:**
+• `/add_token <amount> <user>` - Add tokens
+• `/remove_token <amount> <user>` - Remove tokens
+• `/add_premium <user> <duration>` - Add premium
+• `/remove_premium <user>` - Remove premium
+• `/broadcast <message>` - Broadcast message
+• `/status` - Bot statistics
+"""
 
     META_TXT = """
-**ᴍᴀɴᴀɢɪɴɢ ᴍᴇᴛᴀᴅᴀᴛᴀ ғᴏʀ ʏᴏᴜʀ ᴠɪᴅᴇᴏs ᴀɴᴅ ғɪʟᴇs**
+**🔧 How to Set Metadata:**
 
-**ᴠᴀʀɪᴏᴜꜱ ᴍᴇᴛᴀᴅᴀᴛᴀ:**
+**Use these commands to set metadata:**
 
-- **ᴛɪᴛʟᴇ**: Descriptive title of the media.
-- **ᴀᴜᴛʜᴏʀ**: The creator or owner of the media.
-- **ᴀʀᴛɪꜱᴛ**: The artist associated with the media.
-- **ᴀᴜᴅɪᴏ**: Title or description of audio content.
-- **ꜱᴜʙᴛɪᴛʟᴇ**: Title of subtitle content.
-- **ᴠɪᴅᴇᴏ**: Title or description of video content.
-- **ᴇɴᴄᴏᴅᴇ ʙʏ**: The person who encoded the video.
-- **ᴄᴜꜱᴛᴏᴍ ᴛᴀɢ**: Any Title.
- 
+• `/settitle <title>` - Set video title
+• `/setauthor <author>` - Set author name
+• `/setartist <artist>` - Set artist name
+• `/setaudio <audio>` - Set audio title
+• `/setsubtitle <subtitle>` - Set subtitle
+• `/setvideo <video>` - Set video title
+• `/setencoded_by <name>` - Set encoder name
+• `/setcustom_tag <tag>` - Set custom tag
 
-**ᴄᴏᴍᴍᴀɴᴅꜱ ᴛᴏ ᴛᴜʀɴ ᴏɴ ᴏғғ ᴍᴇᴛᴀᴅᴀᴛᴀ:**
-➜ /metadata: Turn on or off metadata.
+**Example:**
+`/settitle My Video Title`
+`/setauthor @MyChannel`
 
-**ᴄᴏᴍᴍᴀɴᴅꜱ ᴛᴏ ꜱᴇᴛ ᴍᴇᴛᴀᴅᴀᴛᴀ:**
-
-➜ /settitle: Set a custom title of media.
-➜ /setauthor: Set the author.
-➜ /setartist: Set the artist.
-➜ /setaudio: Set audio title.
-➜ /setsubtitle: Set subtitle title.
-➜ /setvideo: Set video title.
-➜ /setencoded_by: Set encoded by title.
-➜ /setcustom_tag: Set custom tag title.
-
-**ᴇxᴀᴍᴘʟᴇ:** /settitle Your Title Here
-
-**ᴜꜱᴇ ᴛʜᴇꜱᴇ ᴄᴏᴍᴍᴀɴᴅꜱ ᴛᴏ ᴇɴʀɪᴄʜ ʏᴏᴜʀ ᴍᴇᴅɪᴀ ᴡɪᴛʜ ᴀᴅᴅɪᴛɪᴏɴᴀʟ ᴍᴇᴛᴀᴅᴀᴛᴀ ɪɴꜰᴏʀᴍᴀᴛɪᴏɴ!**
+**Note:** Metadata will be added to all processed files when enabled.
 """
+
+    PREMIUM_TXT = """
+**💎 Premium Features:**
+
+**🌟 Benefits:**
+• Unlimited file renaming
+• No token consumption
+• Priority processing
+• Faster upload/download speeds
+• Advanced features access
+
+**🎯 How to Get Premium:**
+• Contact admin for premium access
+• Monthly/Yearly subscriptions available
+• Special discounts for bulk purchases
+
+**💬 Contact:** @Bots_Nations_Support
+"""
+
+    PROGRESS_BAR = """\n
+╭──⌯────────────────────╮
+│ 🔄 **ᴘʀᴏɢʀᴇss :** {0}%
+│ 📊 **ᴘʀᴏᴄᴇssᴇᴅ :** {1}
+│ 📁 **ᴛᴏᴛᴀʟ sɪᴢᴇ :** {2}
+│ 🚀 **sᴘᴇᴇᴅ :** {3}/s
+│ ⏱️ **ᴇᴛᴀ :** {4}
+╰─────────────────⌯─────╯ """
