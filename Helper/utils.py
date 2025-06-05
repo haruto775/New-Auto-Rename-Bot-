@@ -1,4 +1,5 @@
-import math, time
+import math
+import time
 from datetime import datetime
 from pytz import timezone
 from config import Config, Txt 
@@ -96,7 +97,5 @@ def add_prefix_suffix(input_string, prefix='', suffix=''):
             return f"{prefix}{filename}{extension}"
         else:
             return f"{prefix}{filename} {suffix}{extension}"
-
-
     else:
         return input_string
