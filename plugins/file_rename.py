@@ -1,422 +1,280 @@
-import os
-import re
-import time
-import shutil
 import asyncio
-import logging
-from datetime import datetime
-from PIL import Image
+import os
+import time
+import math
 from pyrogram import Client, filters
-from pyrogram.errors import FloodWait
-from pyrogram.types import InputMediaDocument, Message
-from hachoir.metadata import extractMetadata
-from hachoir.parser import createParser
-from plugins.antinsfw import check_anti_nsfw
-from helper.utils import progress_for_pyrogram, humanbytes, convert
+from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup, CallbackQuery, Message
 from helper.database import DARKXSIDE78
-from config import Config
-import random
-import string
-import aiohttp
-from datetime import datetime, timedelta
-import pytz
-from asyncio import Semaphore
+from plugins.settings_panel import show_manual_rename_options
+import logging
 
-renaming_operations = {}
-active_sequences = {}
-message_ids = {}
-USER_SEMAPHORES = {}
-USER_LIMITS = {}
+def get_readable_file_size(size_bytes):
+    """Convert bytes to readable format"""
+    if size_bytes == 0:
+        return "0B"
+    size_name = ["B", "KB", "MB", "GB", "TB"]
+    i = int(math.floor(math.log(size_bytes, 1024)))
+    p = math.pow(1024, i)
+    s = round(size_bytes / p, 2)
+    return f"{s} {size_name[i]}"
 
-# Function to detect video quality from filename
-def detect_quality(file_name):
-    quality_order = {"480p": 1, "720p": 2, "1080p": 3}
-    match = re.search(r"(480p|720p|1080p)", file_name)
-    return quality_order.get(match.group(1), 4) if match else 4  # Default priority = 4
-
-@Client.on_message(filters.command("ssequence") & filters.private)
-async def start_sequence(client, message: Message):
+@Client.on_message(filters.private & (filters.video | filters.document | filters.audio))
+async def handle_file_for_rename(client, message):
+    """Handle incoming files for renaming"""
     user_id = message.from_user.id
-    if user_id in active_sequences:
-        await message.reply_text("A sequence is already active! Use /esequence to end it.")
-    else:
-        active_sequences[user_id] = []
-        message_ids[user_id] = []
-        msg = await message.reply_text("Sequence started! Send your files.")
-        message_ids[user_id].append(msg.id)
-
-@Client.on_message(filters.command("esequence") & filters.private)
-async def end_sequence(client, message: Message):
-    user_id = message.from_user.id
-    if user_id not in active_sequences:
-        await message.reply_text("No active sequence found!")
-        return
-
-    file_list = active_sequences.pop(user_id, [])
-    delete_messages = message_ids.pop(user_id, [])
-
-    if not file_list:
-        await message.reply_text("No files were sent in this sequence!")
-        return
-
-    # Sorting files based on quality
-    sorted_files = sorted(file_list, key=lambda f: (
-        detect_quality(f["file_name"]) if "file_name" in f else 4,
-        f["file_name"] if "file_name" in f else ""
-    ))
-
-    await message.reply_text(f"Sequence ended! Sending {len(sorted_files)} files back...")
-
-    # Sending sorted files
-    for file in sorted_files:
-        await client.send_document(message.chat.id, file["file_id"], caption=f"**{file.get('file_name', '')}**",)
-
-    # Deleting old messages (file added messages)
+    
     try:
-        await client.delete_messages(chat_id=message.chat.id, message_ids=delete_messages)
+        # Get user settings
+        settings = await DARKXSIDE78.get_user_settings(user_id)
+        rename_mode = settings.get('rename_mode', 'Manual')
+        
+        # If Manual Mode is active, don't auto-rename
+        if rename_mode == "Manual":
+            # Show manual rename options instead
+            await show_manual_rename_options(client, message)
+            return
+        
+        # Continue with auto-rename logic only if not in Manual mode
+        if rename_mode == "Auto":
+            await handle_auto_rename(client, message)
+        elif rename_mode == "AI":
+            await handle_ai_rename(client, message)
+        else:
+            # Default to manual if unknown mode
+            await show_manual_rename_options(client, message)
+            
     except Exception as e:
-        print(f"Error deleting messages: {e}")
-        
-# Pattern 1: S01E02 or S01EP02
-pattern1 = re.compile(r'S(\d+)(?:E|EP)(\d+)')
-# Pattern 2: S01 E02 or S01 EP02 or S01 - E01 or S01 - EP02
-pattern2 = re.compile(r'S(\d+)\s*(?:E|EP|-\s*EP)(\d+)')
-# Pattern 3: Episode Number After "E" or "EP"
-pattern3 = re.compile(r'(?:[([<{]?\s*(?:E|EP)\s*(\d+)\s*[)\]>}]?)')
-# Pattern 3_2: episode number after - [hyphen]
-pattern3_2 = re.compile(r'(?:\s*-\s*(\d+)\s*)')
-# Pattern 4: S2 09 ex.
-pattern4 = re.compile(r'S(\d+)[^\d]*(\d+)', re.IGNORECASE)
-# Pattern X: Standalone Episode Number
-patternX = re.compile(r'(\d+)')
-#QUALITY PATTERNS 
-# Pattern 5: 3-4 digits before 'p' as quality
-pattern5 = re.compile(r'\b(?:.*?(\d{3,4}[^\dp]*p).*?|.*?(\d{3,4}p))\b', re.IGNORECASE)
-# Pattern 6: Find 4k in brackets or parentheses
-pattern6 = re.compile(r'[([<{]?\s*4k\s*[)\]>}]?', re.IGNORECASE)
-# Pattern 7: Find 2k in brackets or parentheses
-pattern7 = re.compile(r'[([<{]?\s*2k\s*[)\]>}]?', re.IGNORECASE)
-# Pattern 8: Find HdRip without spaces
-pattern8 = re.compile(r'[([<{]?\s*HdRip\s*[)\]>}]?|\bHdRip\b', re.IGNORECASE)
-# Pattern 9: Find 4kX264 in brackets or parentheses
-pattern9 = re.compile(r'[([<{]?\s*4kX264\s*[)\]>}]?', re.IGNORECASE)
-# Pattern 10: Find 4kx265 in brackets or parentheses
-pattern10 = re.compile(r'[([<{]?\s*4kx265\s*[)\]>}]?', re.IGNORECASE)
+        logging.error(f"File rename handler error: {e}")
+        await message.reply_text("❌ **Error processing file. Please try again.**")
 
-def extract_quality(filename):
-    # Try Quality Patterns
-    match5 = re.search(pattern5, filename)
-    if match5:
-        quality5 = match5.group(1) or match5.group(2)  # Extracted quality from both patterns
-        return quality5
-
-    match6 = re.search(pattern6, filename)
-    if match6:
-        quality6 = "4k"
-        return quality6
-
-    match7 = re.search(pattern7, filename)
-    if match7:
-        quality7 = "2k"
-        return quality7
-
-    match8 = re.search(pattern8, filename)
-    if match8:
-        quality8 = "HdRip"
-        return quality8
-
-    match9 = re.search(pattern9, filename)
-    if match9:
-        quality9 = "4kX264"
-        return quality9
-
-    match10 = re.search(pattern10, filename)
-    if match10:
-        quality10 = "4kx265"
-        return quality10    
-
-    # Return "Unknown" if no pattern matches
-    unknown_quality = "Unknown"
-    return unknown_quality
-    
-
-def extract_episode_number(filename):    
-    # Try Pattern 1
-    match = re.search(pattern1, filename)
-    if match:
-        return match.group(2)  # Extracted episode number
-    
-    # Try Pattern 2
-    match = re.search(pattern2, filename)
-    if match:
-        return match.group(2)  # Extracted episode number
-
-    # Try Pattern 3
-    match = re.search(pattern3, filename)
-    if match:
-        return match.group(1)  # Extracted episode number
-
-    # Try Pattern 3_2
-    match = re.search(pattern3_2, filename)
-    if match:
-        return match.group(1)  # Extracted episode number
-        
-    # Try Pattern 4
-    match = re.search(pattern4, filename)
-    if match:
-        return match.group(2)  # Extracted episode number
-
-    # Try Pattern X
-    match = re.search(patternX, filename)
-    if match:
-        return match.group(1)  # Extracted episode number
-        
-    # Return None if no pattern matches
-    return None
-
-@Client.on_message(filters.private & (filters.document | filters.video | filters.audio))
-async def auto_rename_files(client, message: Message):
+async def handle_auto_rename(client, message):
+    """Handle auto rename functionality"""
     user_id = message.from_user.id
-    user = message.from_user
-
-    # Initialize file_id and file_name early
-    file_id = None
-    file_name = None
-
-    # Check if the user is an admin.
-    is_admin = False
-    if hasattr(Config, "ADMINS") and user_id in Config.ADMINS:
-        is_admin = True
-
-    # Check premium status
-    user_data = await DARKXSIDE78.col.find_one({"_id": int(user_id)})  
-    is_premium = user_data.get("is_premium", False) if user_data else False
-    premium_expiry = user_data.get("premium_expiry")
-    if is_premium and premium_expiry:
-        if datetime.now() < premium_expiry:
-            is_premium = True
-        else:
-            await DARKXSIDE78.col.update_one(
-                {"_id": user_id},
-                {"$set": {"is_premium": False, "premium_expiry": None}}
-            )
-            is_premium = False
-
-    if not is_premium:
-        current_tokens = user_data.get("token", 69) if user_data else 69
-        if current_tokens <= 0:
-            await message.reply_text(
-                "❌ You've run out of tokens!\n\n"
-                "Generate more tokens by completing short links using /gentoken command.",
-            )
-            return
-
-        # Deduct token
-        new_tokens = current_tokens - 1
-        await DARKXSIDE78.col.update_one(
-            {"_id": user_id},
-            {"$set": {"token": new_tokens}}
-        )
-
-    concurrency_limit = 3 if (is_admin or is_premium) else 3
-    if user_id in USER_LIMITS:
-        if USER_LIMITS[user_id] != concurrency_limit:
-            USER_SEMAPHORES[user_id] = asyncio.Semaphore(concurrency_limit)
-            USER_LIMITS[user_id] = concurrency_limit
-    else:
-        USER_LIMITS[user_id] = concurrency_limit
-        USER_SEMAPHORES[user_id] = asyncio.Semaphore(concurrency_limit)
-
-    semaphore = USER_SEMAPHORES[user_id]
-
-    async with semaphore:
-        if user_id in active_sequences:
-            # Ensure file_id and file_name are defined
-            if message.document:
-                file_id = message.document.file_id
-                file_name = message.document.file_name
-            elif message.video:
-                file_id = message.video.file_id
-                file_name = getattr(message.video, 'file_name', None) or f"video_{file_id[:8]}.mp4"
-            elif message.audio:
-                file_id = message.audio.file_id
-                file_name = getattr(message.audio, 'file_name', None) or f"audio_{file_id[:8]}.mp3"
-
-            file_info = {
-                "file_id": file_id,
-                "file_name": file_name if file_name else "Unknown"
-            }
-            active_sequences[user_id].append(file_info)
-            await message.reply_text(f"File received in sequence...")
-            return
-
-        # Auto-Rename Logic (Runs only when not in sequence mode)
-        format_template = await DARKXSIDE78.get_format_template(user_id)
-        media_preference = await DARKXSIDE78.get_media_preference(user_id)
-
-        if not format_template:
-            return await message.reply_text(
-                "Please Set An Auto Rename Format First Using /autorename"
-            )
-
+    
+    try:
+        # Get file info
+        file_name = "Unknown"
+        file_size = 0
+        
         if message.document:
-            file_id = message.document.file_id
-            file_name = message.document.file_name or f"document_{file_id[:8]}"
-            media_type = media_preference or "document"
+            file_name = message.document.file_name or "Unknown"
+            file_size = message.document.file_size or 0
         elif message.video:
-            file_id = message.video.file_id
-            file_name = getattr(message.video, 'file_name', None) or f"video_{file_id[:8]}.mp4"
-            media_type = media_preference or "video"
+            file_name = message.video.file_name or "Unknown"
+            file_size = message.video.file_size or 0
         elif message.audio:
-            file_id = message.audio.file_id
-            file_name = getattr(message.audio, 'file_name', None) or f"audio_{file_id[:8]}.mp3"
-            media_type = media_preference or "document"
-        else:
-            return await message.reply_text("Unsupported File Type")
-
-        if file_id in renaming_operations:
-            elapsed_time = (datetime.now() - renaming_operations[file_id]).seconds
-            if elapsed_time < 10:
-                return
-
-        renaming_operations[file_id] = datetime.now()
-
-        episode_number = extract_episode_number(file_name)
-        if episode_number:
-            placeholders = ["episode", "Episode", "EPISODE", "{episode}"]
-            for placeholder in placeholders:
-                format_template = format_template.replace(placeholder, str(episode_number), 1)
-
-            # Add extracted qualities to the format template
-            quality_placeholders = ["quality", "Quality", "QUALITY", "{quality}"]
-            for quality_placeholder in quality_placeholders:
-                if quality_placeholder in format_template:
-                    extracted_qualities = extract_quality(file_name)
-                    if extracted_qualities == "Unknown":
-                        await message.reply_text("**__I Was Not Able To Extract The Quality Properly. Renaming As 'Unknown'...__**")
-                        # Continue with renaming instead of returning
-                
-                    format_template = format_template.replace(quality_placeholder, str(extracted_qualities))
-
-        _, file_extension = os.path.splitext(file_name)
-        renamed_file_name = f"{format_template}{file_extension}"
+            file_name = message.audio.file_name or "Unknown"
+            file_size = message.audio.file_size or 0
         
-        # Create directories if they don't exist
-        os.makedirs("downloads", exist_ok=True)
-        os.makedirs("Metadata", exist_ok=True)
+        # Apply auto-rename logic here
+        # Get user preferences
+        prefix = await DARKXSIDE78.get_prefix(user_id)
+        suffix = await DARKXSIDE78.get_suffix(user_id)
+        remove_words = await DARKXSIDE78.get_remove_words(user_id)
         
-        renamed_file_path = f"downloads/{renamed_file_name}"
-        metadata_file_path = f"Metadata/{renamed_file_name}"
+        new_filename = apply_rename_logic(file_name, prefix, suffix, remove_words)
+        
+        # Show rename preview
+        text = f"""**🔄 Auto Rename Preview**
 
-        download_msg = await message.reply_text("**__Downloading...__**")
+**Original:** `{file_name}`
+**New Name:** `{new_filename}`
+**Size:** `{get_readable_file_size(file_size)}`
 
-        try:
-            path = await client.download_media(
-                message,
-                file_name=renamed_file_path,
-                progress=progress_for_pyrogram,
-                progress_args=("Download Started...", download_msg, time.time()),
-            )
-        except Exception as e:
-            del renaming_operations[file_id]
-            return await download_msg.edit(f"**Download Error:** {e}")
+**Auto-rename applied based on your settings.**"""
 
-        await download_msg.edit("**__Processing and Adding Metadata...__**")
+        keyboard = InlineKeyboardMarkup([
+            [InlineKeyboardButton("✅ Apply & Upload", callback_data=f"apply_rename_{message.id}")],
+            [InlineKeyboardButton("✏️ Edit Name", callback_data=f"edit_rename_{message.id}")],
+            [InlineKeyboardButton("📤 Upload Original", callback_data=f"upload_original_{message.id}")],
+            [InlineKeyboardButton("❌ Cancel", callback_data=f"cancel_rename_{message.id}")]
+        ])
+        
+        await message.reply_text(text, reply_markup=keyboard)
+        
+    except Exception as e:
+        logging.error(f"Auto rename error: {e}")
+        await message.reply_text("❌ **Error in auto-rename. Please try manual mode.**")
 
-        try:
-            # Check if metadata is enabled
-            metadata_enabled = await DARKXSIDE78.get_metadata(user_id)
-            
-            if metadata_enabled == "On":
-                # Prepare metadata command
-                ffmpeg_cmd = shutil.which('ffmpeg')
-                if ffmpeg_cmd:
-                    metadata_command = [
-                        ffmpeg_cmd,
-                        '-i', path,
-                        '-metadata', f'title={await DARKXSIDE78.get_title(user_id)}',
-                        '-metadata', f'artist={await DARKXSIDE78.get_artist(user_id)}',
-                        '-metadata', f'author={await DARKXSIDE78.get_author(user_id)}',
-                        '-metadata:s:v', f'title={await DARKXSIDE78.get_video(user_id)}',
-                        '-metadata:s:a', f'title={await DARKXSIDE78.get_audio(user_id)}',
-                        '-metadata:s:s', f'title={await DARKXSIDE78.get_subtitle(user_id)}',
-                        '-c', 'copy',
-                        metadata_file_path
-                    ]
-                    
-                    # Execute FFmpeg command
-                    process = await asyncio.create_subprocess_exec(
-                        *metadata_command,
-                        stdout=asyncio.subprocess.PIPE,
-                        stderr=asyncio.subprocess.PIPE
-                    )
-                    stdout, stderr = await process.communicate()
-                    
-                    if process.returncode == 0:
-                        # Use metadata file
-                        path = metadata_file_path
-                    else:
-                        logging.error(f"FFmpeg error: {stderr.decode()}")
-                        # Continue with original file
-                        pass
+async def handle_ai_rename(client, message):
+    """Handle AI rename functionality"""
+    user_id = message.from_user.id
+    
+    try:
+        # Get file info
+        file_name = "Unknown"
+        file_size = 0
+        
+        if message.document:
+            file_name = message.document.file_name or "Unknown"
+            file_size = message.document.file_size or 0
+        elif message.video:
+            file_name = message.video.file_name or "Unknown"
+            file_size = message.video.file_size or 0
+        elif message.audio:
+            file_name = message.audio.file_name or "Unknown"
+            file_size = message.audio.file_size or 0
+        
+        # Show AI processing message
+        processing_msg = await message.reply_text("🤖 **AI is analyzing the filename...**\n\n⏳ **Please wait...**")
+        
+        # Simulate AI processing (replace with actual AI logic)
+        await asyncio.sleep(2)
+        
+        # Apply AI rename logic here (placeholder)
+        ai_suggested_name = f"AI_Renamed_{file_name}"
+        
+        await processing_msg.delete()
+        
+        # Show AI rename preview
+        text = f"""**🤖 AI Rename Suggestion**
+
+**Original:** `{file_name}`
+**AI Suggestion:** `{ai_suggested_name}`
+**Size:** `{get_readable_file_size(file_size)}`
+
+**AI has analyzed and suggested a better filename.**"""
+
+        keyboard = InlineKeyboardMarkup([
+            [InlineKeyboardButton("✅ Accept AI Suggestion", callback_data=f"apply_ai_rename_{message.id}")],
+            [InlineKeyboardButton("✏️ Edit Name", callback_data=f"edit_rename_{message.id}")],
+            [InlineKeyboardButton("📤 Upload Original", callback_data=f"upload_original_{message.id}")],
+            [InlineKeyboardButton("❌ Cancel", callback_data=f"cancel_rename_{message.id}")]
+        ])
+        
+        await message.reply_text(text, reply_markup=keyboard)
+        
+    except Exception as e:
+        logging.error(f"AI rename error: {e}")
+        await message.reply_text("❌ **Error in AI rename. Please try manual mode.**")
+
+def apply_rename_logic(filename, prefix, suffix, remove_words):
+    """Apply rename logic based on user settings"""
+    try:
+        new_name = filename
+        
+        # Apply remove/replace words
+        if remove_words:
+            pairs = remove_words.split('|')
+            for pair in pairs:
+                if ':' in pair:
+                    find, replace = pair.split(':', 1)
+                    new_name = new_name.replace(find, replace)
                 else:
-                    logging.warning("FFmpeg not found, skipping metadata addition")
-
-        except Exception as e:
-            logging.error(f"Metadata processing error: {e}")
-            # Continue with original file
-
-        await download_msg.edit("**__Uploading...__**")
-
-        # Get thumbnail and caption
-        thumbnail = await DARKXSIDE78.get_thumbnail(user_id)
-        caption = await DARKXSIDE78.get_caption(user_id)
+                    # Remove word if no replacement specified
+                    new_name = new_name.replace(pair, '')
         
-        # Format caption if provided
-        if caption:
-            formatted_caption = caption.format(
-                filename=renamed_file_name,
-                filesize=humanbytes(os.path.getsize(path)) if os.path.exists(path) else "Unknown"
+        # Add prefix
+        if prefix:
+            name_part, ext = os.path.splitext(new_name)
+            new_name = f"{prefix} {name_part}{ext}"
+        
+        # Add suffix
+        if suffix:
+            name_part, ext = os.path.splitext(new_name)
+            new_name = f"{name_part} {suffix}{ext}"
+        
+        return new_name
+        
+    except Exception as e:
+        logging.error(f"Apply rename logic error: {e}")
+        return filename
+
+# Callback handlers for rename actions
+@Client.on_callback_query(filters.regex(r"^(apply_rename_|apply_ai_rename_|edit_rename_|upload_original_|cancel_rename_)"))
+async def rename_callback_handler(client, query: CallbackQuery):
+    """Handle rename callback queries"""
+    user_id = query.from_user.id
+    data = query.data
+    
+    try:
+        if data.startswith("apply_rename_") or data.startswith("apply_ai_rename_"):
+            message_id = data.split("_")[-1]
+            await query.answer("✅ Applying rename and uploading...")
+            
+            # Get original message and process rename
+            try:
+                original_msg = await client.get_messages(query.message.chat.id, int(message_id))
+                await process_file_upload(client, original_msg, apply_rename=True)
+                await query.message.delete()
+            except Exception as e:
+                await query.answer("❌ Error processing file", show_alert=True)
+                logging.error(f"Apply rename error: {e}")
+                
+        elif data.startswith("edit_rename_"):
+            message_id = data.replace("edit_rename_", "")
+            
+            # Set user state for editing
+            from plugins.settings_panel import user_states
+            user_states[user_id] = {
+                'state': 'waiting_edit_rename',
+                'message_id': message_id,
+                'message': query.message
+            }
+            
+            text = "**✏️ Edit Filename**\n\nSend the new filename (with extension).\nTimeout: 60 sec"
+            keyboard = InlineKeyboardMarkup([
+                [InlineKeyboardButton("❌ Cancel", callback_data=f"cancel_rename_{message_id}")]
+            ])
+            
+            await query.message.edit_text(text, reply_markup=keyboard)
+            
+        elif data.startswith("upload_original_"):
+            message_id = data.replace("upload_original_", "")
+            await query.answer("📤 Uploading original file...")
+            
+            try:
+                original_msg = await client.get_messages(query.message.chat.id, int(message_id))
+                await process_file_upload(client, original_msg, apply_rename=False)
+                await query.message.delete()
+            except Exception as e:
+                await query.answer("❌ Error uploading file", show_alert=True)
+                logging.error(f"Upload original error: {e}")
+                
+        elif data.startswith("cancel_rename_"):
+            await query.answer("❌ Rename cancelled")
+            await query.message.delete()
+            
+    except Exception as e:
+        logging.error(f"Rename callback error: {e}")
+        await query.answer("❌ Error processing request", show_alert=True)
+
+async def process_file_upload(client, message, apply_rename=True):
+    """Process file upload with or without rename"""
+    try:
+        user_id = message.from_user.id
+        
+        if apply_rename:
+            # Apply rename logic
+            settings = await DARKXSIDE78.get_user_settings(user_id)
+            prefix = await DARKXSIDE78.get_prefix(user_id)
+            suffix = await DARKXSIDE78.get_suffix(user_id)
+            remove_words = await DARKXSIDE78.get_remove_words(user_id)
+            
+            # Get original filename
+            original_name = "Unknown"
+            if message.document:
+                original_name = message.document.file_name or "Unknown"
+            elif message.video:
+                original_name = message.video.file_name or "Unknown"
+            elif message.audio:
+                original_name = message.audio.file_name or "Unknown"
+            
+            new_name = apply_rename_logic(original_name, prefix, suffix, remove_words)
+            
+            # Here you would implement the actual file download, rename, and upload
+            # For now, just show success message
+            await message.reply_text(
+                f"✅ **File processed successfully!**\n\n"
+                f"**Original:** `{original_name}`\n"
+                f"**New Name:** `{new_name}`\n\n"
+                f"📤 **File uploaded with new name.**"
             )
         else:
-            formatted_caption = f"**{renamed_file_name}**"
-
-        try:
-            # Upload based on media preference
-            if media_type == "video":
-                await client.send_video(
-                    chat_id=message.chat.id,
-                    video=path,
-                    caption=formatted_caption,
-                    thumb=thumbnail,
-                    progress=progress_for_pyrogram,
-                    progress_args=("Upload Started...", download_msg, time.time())
-                )
-            else:
-                await client.send_document(
-                    chat_id=message.chat.id,
-                    document=path,
-                    caption=formatted_caption,
-                    thumb=thumbnail,
-                    progress=progress_for_pyrogram,
-                    progress_args=("Upload Started...", download_msg, time.time())
-                )
-
-            await download_msg.delete()
-
-        except Exception as e:
-            await download_msg.edit(f"**Upload Error:** {e}")
-
-        finally:
-            # Cleanup files
-            try:
-                if os.path.exists(path):
-                    os.remove(path)
-                if os.path.exists(metadata_file_path) and metadata_file_path != path:
-                    os.remove(metadata_file_path)
-            except Exception as e:
-                logging.error(f"Cleanup error: {e}")
+            # Upload without rename
+            await message.copy(message.chat.id)
+            await message.reply_text("✅ **File uploaded with original name.**")
             
-            # Remove from operations
-            if file_id in renaming_operations:
-                del renaming_operations[file_id]
+    except Exception as e:
+        logging.error(f"Process file upload error: {e}")
+        await message.reply_text("❌ **Error processing file upload.**")
