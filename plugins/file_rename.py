@@ -5,7 +5,10 @@ import math
 from pyrogram import Client, filters
 from pyrogram.types import Message, InlineKeyboardButton, InlineKeyboardMarkup
 from helper.database import DARKXSIDE78
-from plugins.auto_rename import auto_rename_file, show_manual_rename_options
+from plugins.auto_rename import auto_rename_file
+
+# Store user states for file renaming
+user_rename_states = {}
 
 def get_readable_file_size(size_bytes):
     """Convert bytes to readable format"""
@@ -17,6 +20,12 @@ def get_readable_file_size(size_bytes):
     s = round(size_bytes / p, 2)
     return f"{s} {size_name[i]}"
 
+async def clear_user_rename_state_after_timeout(user_id: int, timeout: int):
+    """Clear user rename state after timeout"""
+    await asyncio.sleep(timeout)
+    if user_id in user_rename_states:
+        del user_rename_states[user_id]
+
 @Client.on_message(filters.private & (filters.document | filters.video | filters.audio))
 async def handle_file_for_rename(client, message: Message):
     """Handle incoming files for renaming"""
@@ -26,17 +35,168 @@ async def handle_file_for_rename(client, message: Message):
     settings = await DARKXSIDE78.get_user_settings(user_id)
     rename_mode = settings.get('rename_mode', 'Manual')
     
-    # If Manual Mode is active, show manual options
+    # If Manual Mode is active, show direct rename prompt
     if rename_mode == "Manual":
-        await show_manual_rename_options(client, message)
+        await show_direct_manual_rename(client, message)
         return
     
     # Try auto-rename for Auto/AI modes
     auto_renamed = await auto_rename_file(client, message)
     
-    # If auto-rename failed or not applicable, show manual options
+    # If auto-rename failed or not applicable, show manual rename
     if not auto_renamed:
-        await show_manual_rename_options(client, message)
+        await show_direct_manual_rename(client, message)
+
+async def show_direct_manual_rename(client, message: Message):
+    """Show direct manual rename prompt"""
+    user_id = message.from_user.id
+    
+    # Store file message for later processing
+    user_rename_states[user_id] = {
+        'original_message': message,
+        'state': 'waiting_filename'
+    }
+    
+    # Set timeout
+    asyncio.create_task(clear_user_rename_state_after_timeout(user_id, 60))
+    
+    # Send direct rename prompt
+    rename_msg = await message.reply_text(
+        "**✏️ Manual Rename Mode ✅**\n\n"
+        "Send New file name with extension.\n\n"
+        "**Note:** Don't delete your original file."
+    )
+    
+    # Store the rename message for deletion
+    user_rename_states[user_id]['rename_message'] = rename_msg
+
+@Client.on_message(filters.private & filters.text & ~filters.command(["start", "help", "settings", "autorename", "metadata", "tutorial", "token", "gentoken", "rename", "analyze", "batchrename"]))
+async def handle_manual_rename_input(client, message: Message):
+    """Handle manual rename filename input"""
+    user_id = message.from_user.id
+    
+    # Check if user is in rename state
+    if user_id not in user_rename_states:
+        return
+    
+    state_info = user_rename_states[user_id]
+    if state_info.get('state') != 'waiting_filename':
+        return
+    
+    new_filename = message.text.strip()
+    
+    try:
+        # Delete user's filename message immediately
+        try:
+            await message.delete()
+        except:
+            pass
+        
+        # Delete the rename prompt message
+        try:
+            rename_msg = state_info.get('rename_message')
+            if rename_msg:
+                await rename_msg.delete()
+        except:
+            pass
+        
+        # Validate filename
+        if not new_filename or any(char in new_filename for char in ['/', '\\', ':', '*', '?', '"', '<', '>', '|']):
+            error_msg = await message.reply_text("❌ **Invalid filename!**\n\nFilename contains invalid characters.")
+            await asyncio.sleep(3)
+            await error_msg.delete()
+            # Clear state
+            if user_id in user_rename_states:
+                del user_rename_states[user_id]
+            return
+        
+        # Get original message
+        original_msg = state_info.get('original_message')
+        if not original_msg:
+            if user_id in user_rename_states:
+                del user_rename_states[user_id]
+            return
+        
+        # Start rename and upload process
+        success = await rename_and_upload_file_direct(client, original_msg, new_filename)
+        
+        # Clear state
+        if user_id in user_rename_states:
+            del user_rename_states[user_id]
+        
+    except Exception as e:
+        logging.error(f"Manual rename input error: {e}")
+        # Clear state on error
+        if user_id in user_rename_states:
+            del user_rename_states[user_id]
+
+async def rename_and_upload_file_direct(client, message: Message, new_filename):
+    """Rename and upload file directly without status messages"""
+    try:
+        user_id = message.from_user.id
+        
+        # Start downloading immediately
+        file_path = await message.download()
+        
+        # Create new file path with new name
+        directory = os.path.dirname(file_path)
+        new_file_path = os.path.join(directory, new_filename)
+        
+        # Rename file
+        os.rename(file_path, new_file_path)
+        
+        # Get user settings for upload
+        settings = await DARKXSIDE78.get_user_settings(user_id)
+        thumbnail = await DARKXSIDE78.get_thumbnail(user_id)
+        caption = await DARKXSIDE78.get_caption(user_id)
+        
+        # Prepare caption
+        final_caption = caption or new_filename
+        
+        # Upload based on file type and settings
+        if message.document:
+            if settings.get('send_as') == 'media' and new_filename.lower().endswith(('.mp4', '.avi', '.mkv', '.mov')):
+                await client.send_video(
+                    chat_id=message.chat.id,
+                    video=new_file_path,
+                    caption=final_caption,
+                    thumb=thumbnail,
+                    supports_streaming=True
+                )
+            else:
+                await client.send_document(
+                    chat_id=message.chat.id,
+                    document=new_file_path,
+                    caption=final_caption,
+                    thumb=thumbnail
+                )
+        elif message.video:
+            await client.send_video(
+                chat_id=message.chat.id,
+                video=new_file_path,
+                caption=final_caption,
+                thumb=thumbnail,
+                supports_streaming=True
+            )
+        elif message.audio:
+            await client.send_audio(
+                chat_id=message.chat.id,
+                audio=new_file_path,
+                caption=final_caption,
+                thumb=thumbnail
+            )
+        
+        # Clean up
+        try:
+            os.remove(new_file_path)
+        except:
+            pass
+            
+        return True
+        
+    except Exception as e:
+        logging.error(f"Direct rename and upload error: {e}")
+        return False
 
 @Client.on_message(filters.private & filters.command("rename"))
 async def manual_rename_command(client, message: Message):
@@ -54,22 +214,13 @@ async def manual_rename_command(client, message: Message):
                 
                 # Validate filename
                 if new_filename and not any(char in new_filename for char in ['/', '\\', ':', '*', '?', '"', '<', '>', '|']):
-                    # Show confirmation
-                    original_name = get_original_filename(replied_msg)
+                    # Start direct rename
+                    success = await rename_and_upload_file_direct(client, replied_msg, new_filename)
                     
-                    text = f"""**✏️ Manual Rename Confirmation**
-
-**Original:** `{original_name}`
-**New Name:** `{new_filename}`
-
-Confirm rename?"""
-                    
-                    keyboard = InlineKeyboardMarkup([
-                        [InlineKeyboardButton("✅ Confirm", callback_data=f"confirm_rename_{replied_msg.id}_{new_filename}")],
-                        [InlineKeyboardButton("❌ Cancel", callback_data="cancel_rename")]
-                    ])
-                    
-                    await message.reply_text(text, reply_markup=keyboard)
+                    if success:
+                        await message.reply_text(f"✅ **File renamed to:** `{new_filename}`")
+                    else:
+                        await message.reply_text("❌ **Rename failed!**")
                 else:
                     await message.reply_text("❌ **Invalid filename!**\n\nFilename contains invalid characters.")
             else:
@@ -95,38 +246,6 @@ def get_original_filename(message: Message):
     elif message.audio:
         return message.audio.file_name or "Unknown"
     return "Unknown"
-
-@Client.on_callback_query(filters.regex(r"^confirm_rename_"))
-async def confirm_rename_callback(client, query):
-    """Handle rename confirmation"""
-    try:
-        data_parts = query.data.split('_', 3)
-        message_id = int(data_parts[2])
-        new_filename = data_parts[3] if len(data_parts) > 3 else "renamed_file"
-        
-        # Get original message
-        original_msg = await client.get_messages(query.message.chat.id, message_id)
-        
-        # Process rename
-        from plugins.auto_rename import rename_and_upload_file
-        success = await rename_and_upload_file(client, original_msg, new_filename)
-        
-        if success:
-            await query.message.edit_text(
-                f"✅ **File Renamed Successfully!**\n\n"
-                f"**New Name:** `{new_filename}`"
-            )
-        else:
-            await query.message.edit_text("❌ **Rename Failed!**\n\nPlease try again.")
-            
-    except Exception as e:
-        logging.error(f"Confirm rename error: {e}")
-        await query.answer("❌ Error processing rename", show_alert=True)
-
-@Client.on_callback_query(filters.regex(r"^cancel_rename"))
-async def cancel_rename_callback(client, query):
-    """Handle rename cancellation"""
-    await query.message.edit_text("❌ **Rename Cancelled**")
 
 # File analysis and suggestions
 async def analyze_filename(filename):
@@ -185,54 +304,11 @@ async def analyze_file_command(client, message: Message):
             else:
                 text += "\n\n✅ **No issues found!**\nFilename looks good."
             
-            # Add action buttons
-            keyboard = InlineKeyboardMarkup([
-                [InlineKeyboardButton("🤖 AI Suggest", callback_data=f"ai_suggest_{replied_msg.id}")],
-                [InlineKeyboardButton("✏️ Manual Rename", callback_data=f"manual_rename_{replied_msg.id}")],
-                [InlineKeyboardButton("📤 Upload As Is", callback_data=f"upload_as_is_{replied_msg.id}")]
-            ])
-            
-            await message.reply_text(text, reply_markup=keyboard)
+            await message.reply_text(text)
         else:
             await message.reply_text("❌ **No file found!**\n\nReply to a document, video, or audio file.")
     else:
         await message.reply_text("❌ **No file selected!**\n\nReply to a file with `/analyze`")
-
-@Client.on_callback_query(filters.regex(r"^ai_suggest_"))
-async def ai_suggest_callback(client, query):
-    """Handle AI suggestion request"""
-    try:
-        message_id = int(query.data.split('_')[2])
-        original_msg = await client.get_messages(query.message.chat.id, message_id)
-        
-        # Get AI suggestion
-        from plugins.auto_rename import generate_ai_filename
-        original_name = get_original_filename(original_msg)
-        ai_suggestion = await generate_ai_filename(original_name)
-        
-        if ai_suggestion and ai_suggestion != original_name:
-            text = f"""🤖 **AI Suggestion**
-
-**Original:** `{original_name}`
-**AI Suggested:** `{ai_suggestion}`
-
-Apply this suggestion?"""
-            
-            keyboard = InlineKeyboardMarkup([
-                [InlineKeyboardButton("✅ Apply", callback_data=f"confirm_rename_{message_id}_{ai_suggestion}")],
-                [InlineKeyboardButton("❌ Cancel", callback_data="cancel_rename")]
-            ])
-            
-            await query.message.edit_text(text, reply_markup=keyboard)
-        else:
-            await query.message.edit_text(
-                f"🤖 **AI Analysis Complete**\n\n"
-                f"No improvements suggested for:\n`{original_name}`"
-            )
-            
-    except Exception as e:
-        logging.error(f"AI suggest error: {e}")
-        await query.answer("❌ Error generating AI suggestion", show_alert=True)
 
 # Batch rename functionality
 @Client.on_message(filters.private & filters.command("batchrename"))
