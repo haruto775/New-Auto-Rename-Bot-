@@ -182,7 +182,6 @@ async def check_tokens(client, message: Message):
         disable_web_page_preview=True
     )
 
-
 # Add this callback handler
 @Client.on_callback_query(filters.regex(r"^(gen_tokens|premium_info|refresh_tokens)$"))
 async def token_buttons_handler(client, query: CallbackQuery):
@@ -220,7 +219,6 @@ async def token_buttons_handler(client, query: CallbackQuery):
     elif data == "token_back":
         # Return to main token status
         await check_tokens(client, query.message)
-
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -310,9 +308,6 @@ async def start(client, message: Message):
     await asyncio.sleep(0.4)
     await m.delete()
 
-    # Send sticker after the text sequence
-    await message.reply_sticker("CAACAgUAAyEFAASOHochAAICC2fLz9ooHkh3H5eOdbBszBPLap9-AAJjFAACPONhVtw8FFfxZbTyNgQ")
-
     # Define buttons for the start message
     buttons = InlineKeyboardMarkup([
         [
@@ -344,205 +339,114 @@ async def start(client, message: Message):
 
 # Shorten URL function with retry logic and fallback mechanism
 async def shorten_url(deep_link: str) -> str:
-    api_url = f"https://droplink.co/api?api={Config.TOKEN_API}&url={quote(deep_link)}&format=text"
+    """
+    Shorten URL using available shortener services
+    """
+    if not Config.SHORTENER_API or not Config.SHORTENER_URL:
+        return deep_link  # Return original if no shortener configured
+    
     try:
         async with aiohttp.ClientSession() as session:
-            max_retries = 3
-            for attempt in range(max_retries):
-                async with session.get(api_url, ssl=True) as response:
-                    if response.status == 200:
-                        return (await response.text()).strip()
-                    logging.error(f"API Error: {response.status}")
-                await asyncio.sleep(2 ** attempt)  # Exponential backoff
+            # Example for common shortener APIs
+            payload = {
+                'url': deep_link,
+                'api': Config.SHORTENER_API
+            }
+            
+            async with session.post(Config.SHORTENER_URL, json=payload) as response:
+                if response.status == 200:
+                    data = await response.json()
+                    return data.get('shortenedUrl', deep_link)
+                else:
+                    return deep_link
     except Exception as e:
-        logging.error(f"Connection Error: {e}")
-    # Fallback to original deep link if API fails
-    logging.warning("Shorten URL API failed. Using original deep link.")
-    return deep_link
+        logging.error(f"URL shortening failed: {e}")
+        return deep_link
 
-# Callback Query Handler
-@Client.on_callback_query()
-async def cb_handler(client, query: CallbackQuery):
-    data = query.data
-    user_id = query.from_user.id
-
-    print(f"Callback data received: {data}")  # Debugging line
-
-    if data == "home":
-        await query.message.edit_text(
-            text=Txt.START_TXT.format(query.from_user.mention),
-            disable_web_page_preview=True,
-            reply_markup=InlineKeyboardMarkup([
-                [InlineKeyboardButton("• ᴍʏ ᴀʟʟ ᴄᴏᴍᴍᴀɴᴅs •", callback_data='help')],
-                [InlineKeyboardButton('• ᴜᴘᴅᴀᴛᴇs', url='https://t.me/Bots_Nation'), InlineKeyboardButton('sᴜᴘᴘᴏʀᴛ •', url='https://t.me/Bots_Nation_Support')],
-                [InlineKeyboardButton('• ᴀʙᴏᴜᴛ', callback_data='about'), InlineKeyboardButton('sᴏᴜʀᴄᴇ •', callback_data='source')]
-            ])
-        )
-    elif data == "caption":
-        await query.message.edit_text(
-            text=Txt.CAPTION_TXT,
-            disable_web_page_preview=True,
-            reply_markup=InlineKeyboardMarkup([
-                [InlineKeyboardButton("• sᴜᴘᴘᴏʀᴛ", url='https://t.me/Bots_Nation_Support'), InlineKeyboardButton("ʙᴀᴄᴋ •", callback_data="help")]
-            ])
-        )
-
-    elif data == "help":
-        await query.message.edit_text(
-            text=Txt.HELP_TXT.format(client.mention),
-            disable_web_page_preview=True,
-            reply_markup=InlineKeyboardMarkup([
-                [InlineKeyboardButton("• ᴀᴜᴛᴏ ʀᴇɴᴀᴍᴇ ғᴏʀᴍᴀᴛ •", callback_data='file_names')],
-                [InlineKeyboardButton('• ᴛʜᴜᴍʙɴᴀɪʟ', callback_data='thumbnail'), InlineKeyboardButton('ᴄᴀᴘᴛɪᴏɴ •', callback_data='caption')],
-                [InlineKeyboardButton('• ᴍᴇᴛᴀᴅᴀᴛᴀ', callback_data='meta'), InlineKeyboardButton('ᴅᴏɴᴀᴛᴇ •', callback_data='donate')],
-                [InlineKeyboardButton('• ʜᴏᴍᴇ', callback_data='home')]
-            ])
-        )
-
-    elif data == "meta":
-        await query.message.edit_text(  # Change edit_caption to edit_text
-            text=Txt.SEND_METADATA,  # Changed from caption to text
-            reply_markup=InlineKeyboardMarkup([
-                [InlineKeyboardButton("• ᴄʟᴏsᴇ", callback_data="close"), InlineKeyboardButton("ʙᴀᴄᴋ •", callback_data="help")]
-            ])
-        )
-    elif data == "donate":
-        await query.message.edit_text(
-            text=Txt.DONATE_TXT,
-            disable_web_page_preview=True,
-            reply_markup=InlineKeyboardMarkup([
-                [InlineKeyboardButton("• ʙᴀᴄᴋ", callback_data="help"), InlineKeyboardButton("ᴏᴡɴᴇʀ •", url='https://t.me/DARKXSIDE78')]
-            ])
-        )
-    elif data == "file_names":
-        format_template = await DARKXSIDE78.get_format_template(user_id)
-        await query.message.edit_text(
-            text=Txt.FILE_NAME_TXT.format(format_template=format_template),
-            disable_web_page_preview=True,
-            reply_markup=InlineKeyboardMarkup([
-                [InlineKeyboardButton("• ᴄʟᴏsᴇ", callback_data="close"), InlineKeyboardButton("ʙᴀᴄᴋ •", callback_data="help")]
-            ])
-        )
-    elif data == "thumbnail":
-        await query.message.edit_caption(
-            caption=Txt.THUMBNAIL_TXT,
-            reply_markup=InlineKeyboardMarkup([
-                [InlineKeyboardButton("• ᴄʟᴏsᴇ", callback_data="close"), InlineKeyboardButton("ʙᴀᴄᴋ •", callback_data="help")]
-            ])
-        )
-    elif data == "metadatax":
-        await query.message.edit_caption(
-            caption=Txt.SEND_METADATA,
-            reply_markup=InlineKeyboardMarkup([
-                [InlineKeyboardButton("• ᴄʟᴏsᴇ", callback_data="close"), InlineKeyboardButton("ʙᴀᴄᴋ •", callback_data="help")]
-            ])
-        )
-    elif data == "source":
-        await query.message.edit_caption(
-            caption=Txt.SOURCE_TXT,
-            reply_markup=InlineKeyboardMarkup([
-                [InlineKeyboardButton("• ᴄʟᴏsᴇ", callback_data="close"), InlineKeyboardButton("ʙᴀᴄᴋ •", callback_data="home")]
-            ])
-        )
-    elif data == "premiumx":
-        await query.message.edit_caption(
-            caption=Txt.PREMIUM_TXT,
-            reply_markup=InlineKeyboardMarkup([
-                [InlineKeyboardButton("• ʙᴀᴄᴋ", callback_data="help"), InlineKeyboardButton("ʙᴜʏ ᴘʀᴇᴍɪᴜᴍ •", url='https://t.me/Bots_Nation_Support')]
-            ])
-        )
-    elif data == "plans":
-        await query.message.edit_caption(
-            caption=Txt.PREPLANS_TXT,
-            reply_markup=InlineKeyboardMarkup([
-                [InlineKeyboardButton("• ᴄʟᴏsᴇ", callback_data="close"), InlineKeyboardButton("ʙᴜʏ ᴘʀᴇᴍɪᴜᴍ •", url='https://t.me/Bots_Nation_Support')]
-            ])
-        )
-    elif data == "about":
-        await query.message.edit_text(
-            text=Txt.ABOUT_TXT,
-            disable_web_page_preview=True,
-            reply_markup=InlineKeyboardMarkup([
-                [InlineKeyboardButton("• sᴜᴘᴘᴏʀᴛ", url='https://t.me/Bots_Nation_Support'), InlineKeyboardButton("ᴄᴏᴍᴍᴀɴᴅs •", callback_data="help")],
-                [InlineKeyboardButton("• ᴅᴇᴠᴇʟᴏᴘᴇʀ", url='https://t.me/DARKXSIDE78'), InlineKeyboardButton("ɴᴇᴛᴡᴏʀᴋ •", url='https://t.me/Bots_Nation')],
-                [InlineKeyboardButton("• ʙᴀᴄᴋ •", callback_data="home")]
-            ])
-        )
-    elif data == "close":
-        try:
-            await query.message.delete()
-            await query.message.reply_to_message.delete()
-            await query.message.continue_propagation()
-        except:
-            await query.message.delete()
-            await query.message.continue_propagation()
-
-# Donation Command Handler
-@Client.on_message(filters.command("donate"))
-async def donation(client, message):
-    buttons = InlineKeyboardMarkup([
-        [InlineKeyboardButton(text="ʙᴀᴄᴋ", callback_data="help"), InlineKeyboardButton(text="ᴏᴡɴᴇʀ", url='https://t.me/DARKXSIDE78')]
-    ])
-    yt = await message.reply_photo(photo='https://graph.org/file/1919fe077848bd0783d4c.jpg', caption=Txt.DONATE_TXT, reply_markup=buttons)
-    await asyncio.sleep(300)
-    await yt.delete()
-    await message.delete()
-
-# Premium Command Handler
-@Client.on_message(filters.command("premium"))
-async def getpremium(bot, message):
-    buttons = InlineKeyboardMarkup([
-        [InlineKeyboardButton("ᴏᴡɴᴇʀ", url="https://t.me/DARKXSIDE78"), InlineKeyboardButton("ᴄʟᴏsᴇ", callback_data="close")]
-    ])
-    yt = await message.reply_photo(photo='https://graph.org/file/feebef43bbdf76e796b1b.jpg', caption=Txt.PREMIUM_TXT, reply_markup=buttons)
-    await asyncio.sleep(300)
-    await yt.delete()
-    await message.delete()
-
-# Plan Command Handler
-@Client.on_message(filters.command("plan"))
-async def premium(bot, message):
-    buttons = InlineKeyboardMarkup([
-        [InlineKeyboardButton("sᴇɴᴅ ss", url="https://t.me/Bots_Nation_Support"), InlineKeyboardButton("ᴄʟᴏsᴇ", callback_data="close")]
-    ])
-    yt = await message.reply_photo(photo='https://graph.org/file/8b50e21db819f296661b7.jpg', caption=Txt.PREPLANS_TXT, reply_markup=buttons)
-    await asyncio.sleep(300)
-    await yt.delete()
-    await message.delete()
-
-# Bought Command Handler
-@Client.on_message(filters.command("bought") & filters.private)
-async def bought(client, message):
-    msg = await message.reply('Wait im checking...')
-    replied = message.reply_to_message
-
-    if not replied:
-        await msg.edit("<b>Please reply with the screenshot of your payment for the premium purchase to proceed.\n\nFor example, first upload your screenshot, then reply to it using the '/bought' command</b>")
-    elif replied.photo:
-        await client.send_photo(
-            chat_id=LOG_CHANNEL,
-            photo=replied.photo.file_id,
-            caption=f'<b>User - {message.from_user.mention}\nUser id - <code>{message.from_user.id}</code>\nUsername - <code>{message.from_user.username}</code>\nName - <code>{message.from_user.first_name}</code></b>',
-            reply_markup=InlineKeyboardMarkup([
-                [InlineKeyboardButton("Close", callback_data="close_data")]
-            ])
-        )
-        await msg.edit_text('<b>Your screenshot has been sent to Admins</b>')
-
-@Client.on_message(filters.private & filters.command("help"))
-async def help_command(client, message):
-    # Await get_me to get the bot's user object
-    bot = await client.get_me()
-    mention = bot.mention
-
-    # Send the help message with inline buttons
-    await message.reply_text(
-        text=Txt.HELP_TXT.format(mention=mention),
-        disable_web_page_preview=True,
+@Client.on_callback_query(filters.regex("help"))
+async def help_callback(client, query: CallbackQuery):
+    await query.message.edit_text(
+        text=Txt.HELP_TXT,
         reply_markup=InlineKeyboardMarkup([
-            [InlineKeyboardButton("• ᴀᴜᴛᴏ ʀᴇɴᴀᴍᴇ ғᴏʀᴍᴀᴛ •", callback_data='file_names')],
-            [InlineKeyboardButton('• ᴛʜᴜᴍʙɴᴀɪʟ', callback_data='thumbnail'), InlineKeyboardButton('ᴄᴀᴘᴛɪᴏɴ •', callback_data='caption')],
-            [InlineKeyboardButton('• ᴍᴇᴛᴀᴅᴀᴛᴀ', callback_data='meta'), InlineKeyboardButton('ᴅᴏɴᴀᴛᴇ •', callback_data='donate')],
-            [InlineKeyboardButton('• ʜᴏᴍᴇ', callback_data='home')]
-        ])
+            [InlineKeyboardButton("🏠 Home", callback_data="start")],
+            [InlineKeyboardButton("📊 Commands", callback_data="commands")]
+        ]),
+        disable_web_page_preview=True
     )
+
+@Client.on_callback_query(filters.regex("about"))
+async def about_callback(client, query: CallbackQuery):
+    await query.message.edit_text(
+        text=Txt.ABOUT_TXT,
+        reply_markup=InlineKeyboardMarkup([
+            [InlineKeyboardButton("🏠 Home", callback_data="start")],
+            [InlineKeyboardButton("❓ Help", callback_data="help")]
+        ]),
+        disable_web_page_preview=True
+    )
+
+@Client.on_callback_query(filters.regex("start"))
+async def start_callback(client, query: CallbackQuery):
+    user = query.from_user
+    buttons = InlineKeyboardMarkup([
+        [
+            InlineKeyboardButton("• ᴍʏ ᴀʟʟ ᴄᴏᴍᴍᴀɴᴅs •", callback_data='help')
+        ],
+        [
+            InlineKeyboardButton('• ᴜᴘᴅᴀᴛᴇs', url='https://t.me/Bots_Nation'),
+            InlineKeyboardButton('sᴜᴘᴘᴏʀᴛ •', url='https://t.me/Bots_Nation_Support')
+        ],
+        [
+            InlineKeyboardButton('• ᴀʙᴏᴜᴛ', callback_data='about'),
+            InlineKeyboardButton('sᴏᴜʀᴄᴇ •', callback_data='source')
+        ]
+    ])
+    
+    await query.message.edit_text(
+        text=Txt.START_TXT.format(user.mention),
+        reply_markup=buttons,
+        disable_web_page_preview=True
+    )
+
+@Client.on_callback_query(filters.regex("source"))
+async def source_callback(client, query: CallbackQuery):
+    await query.message.edit_text(
+        text="**📦 Source Code**\n\n"
+             "This bot is open source and available on GitHub.\n"
+             "Feel free to contribute or report issues!\n\n"
+             "**🔗 Repository:** [GitHub](https://github.com/Codeflix-Bots/AutoRenameBot)",
+        reply_markup=InlineKeyboardMarkup([
+            [InlineKeyboardButton("🏠 Home", callback_data="start")],
+            [InlineKeyboardButton("❓ Help", callback_data="help")]
+        ]),
+        disable_web_page_preview=True
+    )
+
+@Client.on_callback_query(filters.regex("commands"))
+async def commands_callback(client, query: CallbackQuery):
+    await query.message.edit_text(
+        text="**📝 All Commands:**\n\n"
+             "**🔧 Setup Commands:**\n"
+             "• `/autorename <template>` - Set rename format\n"
+             "• `/setmedia` - Set media type\n"
+             "• `/metadata` - Configure metadata\n\n"
+             "**📁 File Commands:**\n"
+             "• `/ssequence` - Start sequence\n"
+             "• `/esequence` - End sequence\n\n"
+             "**🎨 Customization:**\n"
+             "• `/set_caption` - Set caption\n"
+             "• `/viewthumb` - View thumbnail\n"
+             "• `/delthumb` - Delete thumbnail\n\n"
+             "**💰 Token System:**\n"
+             "• `/token` - Check balance\n"
+             "• `/gentoken` - Generate tokens",
+        reply_markup=InlineKeyboardMarkup([
+            [InlineKeyboardButton("🏠 Home", callback_data="start")],
+            [InlineKeyboardButton("❓ Help", callback_data="help")]
+        ]),
+        disable_web_page_preview=True
+    )
+
+@Client.on_callback_query(filters.regex("close"))
+async def close_callback(client, query: CallbackQuery):
+    await query.message.delete()
