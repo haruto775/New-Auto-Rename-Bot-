@@ -42,6 +42,18 @@ class Database:
             video='[GenAnimeOfc]',
             encoded_by="GenAnimeOfc [DARKXSIDE78]",
             custom_tag="[GenAnimeOfc]",
+            # New settings for settings panel
+            upload_mode='Telegram',
+            send_as='DOCUMENT',
+            upload_destination=None,
+            prefix=None,
+            suffix=None,
+            rename_mode='Auto',
+            remove_words=None,
+            sample_video=False,
+            screenshot_enabled=False,
+            ai_autorename=False,
+            manual_mode=False,
             ban_status=dict(
                 is_banned=False,
                 ban_duration=0,
@@ -208,130 +220,274 @@ class Database:
             logging.error(f"Error getting media preference for user {id}: {e}")
             return None
 
-    async def get_metadata(self, user_id):
+    async def set_metadata(self, id, metadata):
         try:
-            user = await self.col.find_one({'_id': int(user_id)})
-            return user.get('metadata', "Off") if user else "Off"
+            await self.col.update_one(
+                {"_id": int(id)}, {"$set": {"metadata": metadata}}
+            )
         except Exception as e:
-            logging.error(f"Error getting metadata for user {user_id}: {e}")
+            logging.error(f"Error setting metadata for user {id}: {e}")
+
+    async def get_metadata(self, id):
+        try:
+            user = await self.col.find_one({"_id": int(id)})
+            return user.get("metadata", "Off") if user else "Off"
+        except Exception as e:
+            logging.error(f"Error getting metadata for user {id}: {e}")
             return "Off"
 
-    async def set_metadata(self, user_id, metadata):
+    async def set_title(self, id, title):
         try:
-            await self.col.update_one({'_id': int(user_id)}, {'$set': {'metadata': metadata}})
+            await self.col.update_one(
+                {"_id": int(id)}, {"$set": {"title": title}}
+            )
         except Exception as e:
-            logging.error(f"Error setting metadata for user {user_id}: {e}")
+            logging.error(f"Error setting title for user {id}: {e}")
 
-    async def get_title(self, user_id):
+    async def get_title(self, id):
         try:
-            user = await self.col.find_one({'_id': int(user_id)})
-            return user.get('title', 'GenAnimeOfc [t.me/GenAnimeOfc]') if user else 'GenAnimeOfc [t.me/GenAnimeOfc]'
+            user = await self.col.find_one({"_id": int(id)})
+            return user.get("title", None) if user else None
         except Exception as e:
-            logging.error(f"Error getting title for user {user_id}: {e}")
-            return 'GenAnimeOfc [t.me/GenAnimeOfc]'
+            logging.error(f"Error getting title for user {id}: {e}")
+            return None
 
-    async def set_title(self, user_id, title):
+    async def set_author(self, id, author):
         try:
-            await self.col.update_one({'_id': int(user_id)}, {'$set': {'title': title}})
+            await self.col.update_one(
+                {"_id": int(id)}, {"$set": {"author": author}}
+            )
         except Exception as e:
-            logging.error(f"Error setting title for user {user_id}: {e}")
+            logging.error(f"Error setting author for user {id}: {e}")
 
-    async def get_author(self, user_id):
+    async def get_author(self, id):
         try:
-            user = await self.col.find_one({'_id': int(user_id)})
-            return user.get('author', 'DARKXSIDE78') if user else 'DARKXSIDE78'
+            user = await self.col.find_one({"_id": int(id)})
+            return user.get("author", None) if user else None
         except Exception as e:
-            logging.error(f"Error getting author for user {user_id}: {e}")
-            return 'DARKXSIDE78'
+            logging.error(f"Error getting author for user {id}: {e}")
+            return None
 
-    async def set_author(self, user_id, author):
+    async def set_artist(self, id, artist):
         try:
-            await self.col.update_one({'_id': int(user_id)}, {'$set': {'author': author}})
+            await self.col.update_one(
+                {"_id": int(id)}, {"$set": {"artist": artist}}
+            )
         except Exception as e:
-            logging.error(f"Error setting author for user {user_id}: {e}")
+            logging.error(f"Error setting artist for user {id}: {e}")
 
-    async def get_artist(self, user_id):
+    async def get_artist(self, id):
         try:
-            user = await self.col.find_one({'_id': int(user_id)})
-            return user.get('artist', 'DARKXSIDE78') if user else 'DARKXSIDE78'
+            user = await self.col.find_one({"_id": int(id)})
+            return user.get("artist", None) if user else None
         except Exception as e:
-            logging.error(f"Error getting artist for user {user_id}: {e}")
-            return 'DARKXSIDE78'
+            logging.error(f"Error getting artist for user {id}: {e}")
+            return None
 
-    async def set_artist(self, user_id, artist):
+    async def set_audio(self, id, audio):
         try:
-            await self.col.update_one({'_id': int(user_id)}, {'$set': {'artist': artist}})
+            await self.col.update_one(
+                {"_id": int(id)}, {"$set": {"audio": audio}}
+            )
         except Exception as e:
-            logging.error(f"Error setting artist for user {user_id}: {e}")
+            logging.error(f"Error setting audio for user {id}: {e}")
 
-    async def get_audio(self, user_id):
+    async def get_audio(self, id):
         try:
-            user = await self.col.find_one({'_id': int(user_id)})
-            return user.get('audio', '[GenAnimeOfc]') if user else '[GenAnimeOfc]'
+            user = await self.col.find_one({"_id": int(id)})
+            return user.get("audio", None) if user else None
         except Exception as e:
-            logging.error(f"Error getting audio for user {user_id}: {e}")
-            return '[GenAnimeOfc]'
+            logging.error(f"Error getting audio for user {id}: {e}")
+            return None
 
-    async def set_audio(self, user_id, audio):
+    async def set_subtitle(self, id, subtitle):
         try:
-            await self.col.update_one({'_id': int(user_id)}, {'$set': {'audio': audio}})
+            await self.col.update_one(
+                {"_id": int(id)}, {"$set": {"subtitle": subtitle}}
+            )
         except Exception as e:
-            logging.error(f"Error setting audio for user {user_id}: {e}")
+            logging.error(f"Error setting subtitle for user {id}: {e}")
 
-    async def get_subtitle(self, user_id):
+    async def get_subtitle(self, id):
         try:
-            user = await self.col.find_one({'_id': int(user_id)})
-            return user.get('subtitle', "[GenAnimeOfc]") if user else "[GenAnimeOfc]"
+            user = await self.col.find_one({"_id": int(id)})
+            return user.get("subtitle", None) if user else None
         except Exception as e:
-            logging.error(f"Error getting subtitle for user {user_id}: {e}")
-            return "[GenAnimeOfc]"
+            logging.error(f"Error getting subtitle for user {id}: {e}")
+            return None
 
-    async def set_subtitle(self, user_id, subtitle):
+    async def set_video(self, id, video):
         try:
-            await self.col.update_one({'_id': int(user_id)}, {'$set': {'subtitle': subtitle}})
+            await self.col.update_one(
+                {"_id": int(id)}, {"$set": {"video": video}}
+            )
         except Exception as e:
-            logging.error(f"Error setting subtitle for user {user_id}: {e}")
+            logging.error(f"Error setting video for user {id}: {e}")
 
-    async def get_video(self, user_id):
+    async def get_video(self, id):
         try:
-            user = await self.col.find_one({'_id': int(user_id)})
-            return user.get('video', '[GenAnimeOfc]') if user else '[GenAnimeOfc]'
+            user = await self.col.find_one({"_id": int(id)})
+            return user.get("video", None) if user else None
         except Exception as e:
-            logging.error(f"Error getting video for user {user_id}: {e}")
-            return '[GenAnimeOfc]'
+            logging.error(f"Error getting video for user {id}: {e}")
+            return None
 
-    async def set_video(self, user_id, video):
+    async def set_encoded_by(self, id, encoded_by):
         try:
-            await self.col.update_one({'_id': int(user_id)}, {'$set': {'video': video}})
+            await self.col.update_one(
+                {"_id": int(id)}, {"$set": {"encoded_by": encoded_by}}
+            )
         except Exception as e:
-            logging.error(f"Error setting video for user {user_id}: {e}")
+            logging.error(f"Error setting encoded_by for user {id}: {e}")
 
-    async def get_encoded_by(self, user_id):
+    async def get_encoded_by(self, id):
         try:
-            user = await self.col.find_one({'_id': int(user_id)})
-            return user.get('encoded_by', "GenAnimeOfc [DARKXSIDE78]") if user else "GenAnimeOfc [DARKXSIDE78]"
+            user = await self.col.find_one({"_id": int(id)})
+            return user.get("encoded_by", None) if user else None
         except Exception as e:
-            logging.error(f"Error getting encoded_by for user {user_id}: {e}")
-            return "GenAnimeOfc [DARKXSIDE78]"
+            logging.error(f"Error getting encoded_by for user {id}: {e}")
+            return None
 
-    async def set_encoded_by(self, user_id, encoded_by):
+    async def set_custom_tag(self, id, custom_tag):
         try:
-            await self.col.update_one({'_id': int(user_id)}, {'$set': {'encoded_by': encoded_by}})
+            await self.col.update_one(
+                {"_id": int(id)}, {"$set": {"custom_tag": custom_tag}}
+            )
         except Exception as e:
-            logging.error(f"Error setting encoded_by for user {user_id}: {e}")
+            logging.error(f"Error setting custom_tag for user {id}: {e}")
 
-    async def get_custom_tag(self, user_id):
+    async def get_custom_tag(self, id):
         try:
-            user = await self.col.find_one({'_id': int(user_id)})
-            return user.get('custom_tag', "[GenAnimeOfc]") if user else "[GenAnimeOfc]"
+            user = await self.col.find_one({"_id": int(id)})
+            return user.get("custom_tag", None) if user else None
         except Exception as e:
-            logging.error(f"Error getting custom_tag for user {user_id}: {e}")
-            return "[GenAnimeOfc]"
+            logging.error(f"Error getting custom_tag for user {id}: {e}")
+            return None
 
-    async def set_custom_tag(self, user_id, custom_tag):
+    async def set_metadata_code(self, id, metadata_code):
         try:
-            await self.col.update_one({'_id': int(user_id)}, {'$set': {'custom_tag': custom_tag}})
+            await self.col.update_one(
+                {"_id": int(id)}, {"$set": {"metadata_code": metadata_code}}
+            )
         except Exception as e:
-            logging.error(f"Error setting custom_tag for user {user_id}: {e}")
+            logging.error(f"Error setting metadata_code for user {id}: {e}")
 
+    async def get_metadata_code(self, id):
+        try:
+            user = await self.col.find_one({"_id": int(id)})
+            return user.get("metadata_code", "Telegram : @DARKXSIDE78") if user else "Telegram : @DARKXSIDE78"
+        except Exception as e:
+            logging.error(f"Error getting metadata_code for user {id}: {e}")
+            return "Telegram : @DARKXSIDE78"
+
+    # NEW SETTINGS PANEL METHODS
+
+    async def get_user_settings(self, user_id):
+        """Get all user settings in one query"""
+        try:
+            user = await self.col.find_one({"_id": int(user_id)})
+            if not user:
+                return self.new_user_settings()
+            
+            # Return all settings with defaults
+            return {
+                'upload_mode': user.get('upload_mode', 'Telegram'),
+                'send_as': user.get('send_as', 'DOCUMENT'),
+                'upload_destination': user.get('upload_destination', None),
+                'custom_thumbnail': user.get('file_id', None),
+                'prefix': user.get('prefix', None),
+                'suffix': user.get('suffix', None),
+                'rename_mode': user.get('rename_mode', 'Auto'),
+                'remove_words': user.get('remove_words', None),
+                'sample_video': user.get('sample_video', False),
+                'screenshot_enabled': user.get('screenshot_enabled', False),
+                'ai_autorename': user.get('ai_autorename', False),
+                'manual_mode': user.get('manual_mode', False)
+            }
+        except Exception as e:
+            logging.error(f"Error getting user settings: {e}")
+            return self.new_user_settings()
+
+    def new_user_settings(self):
+        """Default settings for new users"""
+        return {
+            'upload_mode': 'Telegram',
+            'send_as': 'DOCUMENT', 
+            'upload_destination': None,
+            'custom_thumbnail': None,
+            'prefix': None,
+            'suffix': None,
+            'rename_mode': 'Auto',
+            'remove_words': None,
+            'sample_video': False,
+            'screenshot_enabled': False,
+            'ai_autorename': False,
+            'manual_mode': False
+        }
+
+    async def update_user_setting(self, user_id, setting_key, value):
+        """Update a specific user setting"""
+        try:
+            await self.col.update_one(
+                {"_id": int(user_id)},
+                {"$set": {setting_key: value}}
+            )
+            return True
+        except Exception as e:
+            logging.error(f"Error updating setting {setting_key}: {e}")
+            return False
+
+    async def set_prefix(self, user_id, prefix):
+        """Set filename prefix"""
+        return await self.update_user_setting(user_id, 'prefix', prefix)
+
+    async def get_prefix(self, user_id):
+        """Get filename prefix"""
+        try:
+            user = await self.col.find_one({"_id": int(user_id)})
+            return user.get('prefix', None) if user else None
+        except Exception as e:
+            logging.error(f"Error getting prefix: {e}")
+            return None
+
+    async def set_suffix(self, user_id, suffix):
+        """Set filename suffix"""
+        return await self.update_user_setting(user_id, 'suffix', suffix)
+
+    async def get_suffix(self, user_id):
+        """Get filename suffix"""
+        try:
+            user = await self.col.find_one({"_id": int(user_id)})
+            return user.get('suffix', None) if user else None
+        except Exception as e:
+            logging.error(f"Error getting suffix: {e}")
+            return None
+
+    async def set_upload_destination(self, user_id, destination):
+        """Set upload destination channel/group"""
+        return await self.update_user_setting(user_id, 'upload_destination', destination)
+
+    async def get_upload_destination(self, user_id):
+        """Get upload destination"""
+        try:
+            user = await self.col.find_one({"_id": int(user_id)})
+            return user.get('upload_destination', None) if user else None
+        except Exception as e:
+            logging.error(f"Error getting upload destination: {e}")
+            return None
+
+    async def set_remove_words(self, user_id, words):
+        """Set words to remove from filenames"""
+        return await self.update_user_setting(user_id, 'remove_words', words)
+
+    async def get_remove_words(self, user_id):
+        """Get words to remove from filenames"""
+        try:
+            user = await self.col.find_one({"_id": int(user_id)})
+            return user.get('remove_words', None) if user else None
+        except Exception as e:
+            logging.error(f"Error getting remove words: {e}")
+            return None
+
+# Create database instance
 DARKXSIDE78 = Database(Config.DB_URL, Config.DB_NAME)
