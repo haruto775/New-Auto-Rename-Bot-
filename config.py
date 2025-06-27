@@ -2,6 +2,7 @@ import os
 from os import environ 
 
 class Config:
+print("BOT_TOKEN being used:", os.environ.get("BOT_TOKEN"))
     # Bot Configuration - Handle swapped credentials
     API_ID_ENV = environ.get("API_ID", "28614709")
     API_HASH_ENV = environ.get("API_HASH", "f36fd2ee6e3d3a17c4d244ff6dc1bac8")
