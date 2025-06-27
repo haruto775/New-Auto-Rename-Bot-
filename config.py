@@ -7,10 +7,10 @@ class Config:
     API_HASH_ENV = environ.get("API_HASH", "f36fd2ee6e3d3a17c4d244ff6dc1bac8")
     
     # Fix swapped credentials: API_ID should be numeric, API_HASH should be string
-    if API_ID_ENV.isdigit(28614709):
+    if API_ID_ENV.isdigit():
         API_ID = int(API_ID_ENV)
         API_HASH = API_HASH_ENV
-    elif API_HASH_ENV.isdigit(f36fd2ee6e3d3a17c4d244ff6dc1bac8):
+    elif API_HASH_ENV.isdigit():
         # Values are swapped
         API_ID = int(API_HASH_ENV)
         API_HASH = API_ID_ENV
