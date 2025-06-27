@@ -41,6 +41,8 @@ class Config:
     WEBHOOK = environ.get("WEBHOOK", "True").lower() == "true"
     BOT_UPTIME = environ.get("BOT_UPTIME", "")
     
+
+    PORT = 8080
     # Token System Configuration
     TOKEN_ID_LENGTH = 8
     SHORTENER_API = environ.get("SHORTENER_API", "")
