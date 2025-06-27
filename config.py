@@ -7,10 +7,10 @@ class Config:
     API_HASH_ENV = environ.get("API_HASH", "f36fd2ee6e3d3a17c4d244ff6dc1bac8")
     
     # Fix swapped credentials: API_ID should be numeric, API_HASH should be string
-    if API_ID_ENV.isdigit():
+    if API_ID_ENV.isdigit(23476863):
         API_ID = int(API_ID_ENV)
         API_HASH = API_HASH_ENV
-    elif API_HASH_ENV.isdigit():
+    elif API_HASH_ENV.isdigit(69daa0835439c4211f34c2e9ad0acb5c):
         # Values are swapped
         API_ID = int(API_HASH_ENV)
         API_HASH = API_ID_ENV
@@ -18,20 +18,20 @@ class Config:
         API_ID = 0
         API_HASH = ""
     
-    BOT_TOKEN = environ.get("BOT_TOKEN", "7512154282:AAFGm5R7s_9iCDRmlj5VrFSkJheimWV-rZM")
-    BOT_USERNAME = environ.get("BOT_USERNAME", "Tesfyrdcboybot")
+    BOT_TOKEN = environ.get("BOT_TOKEN", "7065585708:AAGnfDHchn9pSCWvHLA7tVxhNTJR1vBnaUE")
+    BOT_USERNAME = environ.get("BOT_USERNAME", "Mythic_AutoRenamerBot")
     
     # Admin Configuration
-    ADMIN = list(map(int, environ.get("ADMIN", "7970350353").split()))
+    ADMIN = list(map(int, environ.get("ADMIN", "6617544956").split()))
     ADMINS = ADMIN  # For compatibility with uploaded files
     
     # Database Configuration
-    DB_URL = environ.get("DB_URL", "mongodb+srv://ZeroTwo:aloksingh@zerotwo.3q3ij.mongodb.net/?retryWrites=true&w=majority")
-    DB_NAME = environ.get("DB_NAME", "AutoRenameBot")
+    DB_URL = environ.get("DB_URL", "mongodb+srv://Rename:XoFpKwreyhCeEvcI@rename.aukmb5u.mongodb.net/")
+    DB_NAME = environ.get("DB_NAME", "Rename")
     
     # Channels Configuration
     FORCE_SUB_CHANNELS = environ.get("FORCE_SUB_CHANNELS", "").split(",") if environ.get("FORCE_SUB_CHANNELS") else []
-    LOG_CHANNEL = int(environ.get("LOG_CHANNEL", "0")) if environ.get("LOG_CHANNEL") else None
+    LOG_CHANNEL = int(environ.get("LOG_CHANNEL", "-1002475576837")) if environ.get("LOG_CHANNEL") else None
     
     # Media Configuration
     START_PIC = environ.get("START_PIC", "https://graph.org/file/a27d85469761da836337c.jpg")
