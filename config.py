@@ -18,7 +18,7 @@ class Config:
         API_ID = 0
         API_HASH = ""
     
-    BOT_TOKEN = environ.get("BOT_TOKEN", "7065585708:AAGnfDHchn9pSCWvHLA7tVxhNTJR1vBnaUE")
+    BOT_TOKEN = environ.get("BOT_TOKEN", "7065585708:AAGAMTGmAGzsIziOu7RIYc2a9CXErxROaSk")
     BOT_USERNAME = environ.get("BOT_USERNAME", "Mythic_AutoRenamerBot")
     
     # Admin Configuration
