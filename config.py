@@ -2,7 +2,7 @@ import os
 from os import environ 
 
 class Config:
-print("BOT_TOKEN being used:", os.environ.get("BOT_TOKEN"))
+
     # Bot Configuration - Handle swapped credentials
     API_ID_ENV = environ.get("API_ID", "28614709")
     API_HASH_ENV = environ.get("API_HASH", "f36fd2ee6e3d3a17c4d244ff6dc1bac8")
@@ -20,6 +20,7 @@ print("BOT_TOKEN being used:", os.environ.get("BOT_TOKEN"))
         API_HASH = ""
     
     BOT_TOKEN = environ.get("BOT_TOKEN", "7691475152:AAGOLa_hgm8RC73NKepmORPofcqp_P12v58")
+    print("BOT_TOKEN being used:", BOT_TOKEN)  # ✅ This now works
     BOT_USERNAME = environ.get("BOT_USERNAME", "Anime_AutoRenamerBot")
     
     # Admin Configuration
