@@ -33,7 +33,7 @@ class Config:
     
     # Channels Configuration
     FORCE_SUB_CHANNELS = environ.get("FORCE_SUB_CHANNELS", "").split(",") if environ.get("FORCE_SUB_CHANNELS") else []
-    LOG_CHANNEL = int(environ.get("LOG_CHANNEL", "-1002475576837")) if environ.get("LOG_CHANNEL") else None
+    LOG_CHANNEL = int(environ.get("LOG_CHANNEL", "-1002433166084")) if environ.get("LOG_CHANNEL") else None
     
     # Media Configuration
     START_PIC = environ.get("START_PIC", "https://graph.org/file/a27d85469761da836337c.jpg")
