@@ -19,9 +19,9 @@ class Config:
         API_ID = 0
         API_HASH = ""
     
-    BOT_TOKEN = environ.get("BOT_TOKEN", "7691475152:AAGOLa_hgm8RC73NKepmORPofcqp_P12v58")
+    BOT_TOKEN = environ.get("BOT_TOKEN", "7065585708:AAGAMTGmAGzsIziOu7RIYc2a9CXErxROaSk")
     #print("BOT_TOKEN being used:", BOT_TOKEN)  # ✅ This now works
-    BOT_USERNAME = environ.get("BOT_USERNAME", "Anime_AutoRenamerBot")
+    BOT_USERNAME = environ.get("BOT_USERNAME", "Mythic_AutoRenamerBot")
     
     # Admin Configuration
     ADMIN = list(map(int, environ.get("ADMIN", "6617544956").split()))
