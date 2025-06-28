@@ -40,7 +40,7 @@ class Bot(Client):
             try:
                 # Send a request to the web server to keep it alive
                 async with aiohttp.ClientSession() as session:
-                    async with session.get("http://localhost:5000") as response:
+                    async with session.get("http://localhost:5022") as response:
                         if response.status == 200:
                             print("Ping successful")
                         else:
