@@ -20,7 +20,7 @@ class Config:
         API_HASH = ""
     
     BOT_TOKEN = environ.get("BOT_TOKEN", "7691475152:AAGOLa_hgm8RC73NKepmORPofcqp_P12v58")
-    print("BOT_TOKEN being used:", BOT_TOKEN)  # ✅ This now works
+    #print("BOT_TOKEN being used:", BOT_TOKEN)  # ✅ This now works
     BOT_USERNAME = environ.get("BOT_USERNAME", "Anime_AutoRenamerBot")
     
     # Admin Configuration
